@@ -406,7 +406,8 @@ INDEX = r"""<!doctype html><html lang="zh"><head>
  .gsug{font-size:11.5px;color:#8a9299;flex:1}
  .gtot{font-size:12.5px;color:#191c1f;font-weight:600;white-space:nowrap}
  .mrow{position:relative;overflow:hidden;border-bottom:1px solid #f0f2f4}
- .dz{position:absolute;top:0;left:0;bottom:0;width:72px;display:flex;align-items:center;justify-content:center}
+ .dz{position:absolute;top:0;bottom:0;width:72px;display:flex;align-items:center;justify-content:center}
+ .dz.l{left:0}.dz.r{right:0}
  .delzone2{width:100%;height:100%;border:0;background:#f87171;color:#fff;font-size:13px;font-weight:600}
  .mmain{position:relative;display:flex;align-items:center;gap:9px;padding:8px 2px;background:#fff;transition:transform .18s;touch-action:pan-y;user-select:none}
  .thumb{width:44px;height:44px;border-radius:10px;object-fit:cover;flex:none;background:#f0f2f4}
@@ -454,7 +455,7 @@ INDEX = r"""<!doctype html><html lang="zh"><head>
   <button class="send" id="bSend">发送</button></div>
  <input type="file" id="photo" accept="image/*" capture="environment" style="display:none">
  <div id="reply"></div></div>
-<div class="card"><div class="muted" style="margin-bottom:4px">今日明细 · 右侧点改 · 左滑删</div><div id="list"></div></div>
+<div class="card"><div class="muted" style="margin-bottom:4px">今日明细 · 右侧点改 · 左右滑删</div><div id="list"></div></div>
 <div id="av">
  <div class="avbar">
   <button id="avBack">‹</button>
@@ -505,6 +506,7 @@ INDEX = r"""<!doctype html><html lang="zh"><head>
 <div id="toast"></div>
 <script>
 const $=id=>document.getElementById(id);
+window.onerror=function(m){try{toast("页面错误:"+m);}catch(_){}};
 let user=localStorage.getItem("fg_user")||"beifeng";
 function paintSeg(){$("u1").classList.toggle("on",user==="beifeng");$("u2").classList.toggle("on",user==="gagayouna");}
 $("u1").textContent="🧑 邶风";$("u2").textContent="👩 gagayouna";
@@ -586,7 +588,8 @@ async function refresh(){
     "<span class='gtot'>"+g.tot+" 千卡</span></div>";
    for(const r of g.items){
     h+="<div class='mrow' data-id='"+r.id+"'>"+
-     "<div class='dz'><button class='delzone2' data-del='"+r.id+"'>删除</button></div>"+
+     "<div class='dz l'><button class='delzone2' data-del='"+r.id+"'>删除</button></div>"+
+     "<div class='dz r'><button class='delzone2' data-del='"+r.id+"'>删除</button></div>"+
      "<div class='mmain'>"+
      (r.photo?"<img class='thumb' src='/photo/"+r.id+"' alt=''>":"<div class='thumb ph'>🍳</div>")+
      "<div class='mname'>"+esc(r.food)+"</div>"+
@@ -597,33 +600,35 @@ async function refresh(){
   bindSwipe($("list"));
  }catch(e){toast("加载失败："+e.message);}
 }
-let openId=null,suppressClick=false,_recs={};
+let openId=null,openDir="R",suppressClick=false,_recs={};
 function closeOpen(exceptId){document.querySelectorAll("#list .mrow").forEach(row=>{
  if(+row.dataset.id!==exceptId)row.querySelector(".mmain").style.transform="";});}
 function bindSwipe(list){
  list.querySelectorAll(".mrow").forEach(row=>{
   const rid=+row.dataset.id,main=row.querySelector(".mmain");
-  let sx=0,drag=false,moved=false;
-  main.addEventListener("pointerdown",e=>{sx=e.clientX;drag=true;moved=false;main.style.transition="none";
-   try{main.setPointerCapture(e.pointerId);}catch(_){/* 老浏览器忽略 */}});
+  let sx=0,sy=0,drag=false,moved=false,cap=false;
+  main.addEventListener("pointerdown",e=>{sx=e.clientX;sy=e.clientY;drag=true;moved=false;cap=false;main.style.transition="none";});
   main.addEventListener("pointermove",e=>{if(!drag)return;
-   const dx=e.clientX-sx;
-   if(!moved&&Math.abs(dx)>8&&Math.abs(dx)>Math.abs(e.clientY))moved=true;
+   const dx=e.clientX-sx,dy=e.clientY-sy;
+   if(!moved&&Math.abs(dx)>8&&Math.abs(dx)>Math.abs(dy)){
+    moved=true;suppressClick=true;setTimeout(()=>suppressClick=false,350);
+    try{main.setPointerCapture(e.pointerId);}catch(_){}}
    if(!moved)return;
-   const base=openId===rid?68:0;
-   main.style.transform="translateX("+Math.max(0,Math.min(72,base+dx))+"px)";});
+   const base=openId===rid?(openDir==="L"?-72:72):0;
+   main.style.transform="translateX("+Math.max(-72,Math.min(72,base+dx))+"px)";});
   const end=e=>{if(!drag)return;drag=false;main.style.transition="";
+   if(cap){try{main.releasePointerCapture(e.pointerId);}catch(_){}}
    if(!moved){if(openId===rid){main.style.transform="";openId=null;}return;}
-   suppressClick=true;setTimeout(()=>suppressClick=false,350);
-   const t=(openId===rid?68:0)+(e.clientX-sx);
-   if(t>36){closeOpen(rid);main.style.transform="translateX(72px)";openId=rid;}
+   const t=(openId===rid?(openDir==="L"?-72:72):0)+(e.clientX-sx);
+   if(Math.abs(t)>36){closeOpen(rid);openDir=t<0?"L":"R";
+    main.style.transform="translateX("+(openDir==="L"?-72:72)+"px)";openId=rid;}
    else{main.style.transform="";if(openId===rid)openId=null;}};
   main.addEventListener("pointerup",end);
   main.addEventListener("pointercancel",()=>{drag=false;main.style.transition="";
-   main.style.transform=openId===rid?"translateX(72px)":"";});
+   if(openId===rid)main.style.transform="translateX("+(openDir==="L"?-72:72)+"px)";else main.style.transform="";});
   main.addEventListener("click",e=>{if(suppressClick||drag||moved)return;
    if(e.target.closest(".kcell"))editId(rid,_recs[rid].kcal);});
-  row.querySelector(".delzone2").addEventListener("click",()=>delId(rid));
+  row.querySelectorAll(".delzone2").forEach(b=>b.addEventListener("click",()=>delId(rid)));
  });
 }
 async function sendText(){
@@ -984,11 +989,19 @@ class H(BaseHTTPRequestHandler):
                 it = resolve_item(items[0], user)
                 if not it.get("meal_type"):
                     it["meal_type"] = valid[cid]["meal_type"]
+                old_food = valid[cid]["food"]
+                new_food = it.get("food", "")
                 with db() as conn:
                     conn.execute(
                         "UPDATE meals SET food=?,meal_type=?,kcal=?,kcal_low=?,kcal_high=?,protein_g=?,note=? WHERE id=?",
-                        (it.get("food", ""), it["meal_type"], it.get("kcal"), it.get("kcal_low"),
+                        (new_food, it["meal_type"], it.get("kcal"), it.get("kcal_low"),
                          it.get("kcal_high"), it.get("protein_g"), it.get("note", ""), cid))
+                    # 扣回项跟随改名，保持一致性（红烧肉→回锅肉 时，扣回:红烧肉 → 扣回:回锅肉）
+                    if old_food and new_food and old_food != new_food:
+                        for pfx in ("扣回:", "扣回："):
+                            conn.execute(
+                                "UPDATE meals SET food=? WHERE user_id=? AND date=? AND food=?",
+                                (pfx + new_food, user, pre["date"], pfx + old_food))
                 summary = today_summary(user)
                 reply = build_card([it], summary, verb="更正")
                 if CFG.get("mock"):
