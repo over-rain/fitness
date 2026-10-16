@@ -188,15 +188,16 @@ def infer_meal_type():
 
 # ---------------------------------------------------------------- 模型调用
 
-def llm_analyze(text, image_b64, recent=None, extra=""):
-    """识别食物+判断意图；mock 模式返回固定结果。协议按配置：openai(默认) / anthropic"""
+def llm_analyze(text, image_b64, recent=None, extra="", llm_cfg=None):
+    """识别食物+判断意图；mock 模式返回固定结果。协议按配置：openai(默认) / anthropic
+    llm_cfg：可选的独立模型配置（文字通道快模型），缺省用主配置"""
     if CFG.get("mock"):
         src = text or "(图片)"
         return {"action": "record", "id": 0,
                 "items": [{"food": src[:20] or "示例餐", "portion": "1份",
                            "kcal": 400, "kcal_low": 320, "kcal_high": 480,
                            "protein_g": 15, "fat_g": 12, "carb_g": 45}]}
-    llm = CFG["llm"]
+    llm = llm_cfg or CFG["llm"]
     ctx = ""
     if recent:
         ctx += "\n【今日已有记录】" + json.dumps(recent, ensure_ascii=False)
@@ -980,7 +981,11 @@ class H(BaseHTTPRequestHandler):
         pre = today_summary(user)
         recent = [{"id": r["id"], "meal_type": r["meal_type"], "food": r["food"], "kcal": r["kcal"]}
                   for r in pre["records"]][-5:]  # 上下文防重复，但不宜过长（思考型模型越慢）
-        analysis = llm_analyze(text, image_b64, recent)
+        # 双通道：纯文字记录可走快模型（config.text_llm），拍照走主视觉模型
+        if not image_b64 and CFG.get("text_llm"):
+            analysis = llm_analyze(text, None, recent, llm_cfg=CFG["text_llm"])
+        else:
+            analysis = llm_analyze(text, image_b64, recent)
         items = analysis.get("items") or []
         if not items:
             return self._json(200, {"reply": "🤔 没识别出食物。说清楚点或拍清楚点再试一次。", "items": []})
