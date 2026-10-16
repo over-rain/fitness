@@ -1,0 +1,11 @@
+{
+  "port": 8124,
+  "access_code": "",
+  "mock": true,
+  "llm": {
+    "protocol": "anthropic",
+    "base_url": "https://ark.cn-beijing.volces.com/api/coding",
+    "api_key": "填入你的 ark key（coding 网关走 anthropic 协议；标准 ark/OpenAI 口则去掉 protocol 行或改 openai）",
+    "model": "glm-5.3-flash"
+  }
+}

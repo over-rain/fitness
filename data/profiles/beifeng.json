@@ -1,0 +1,20 @@
+{
+  "user": "beifeng",
+  "display_name": "邶风",
+  "height_cm": 178.0,
+  "weight_kg": 86.0,
+  "age": 26,
+  "gender": "male",
+  "goal": "fat_loss",
+  "target_weight_kg": 78.0,
+  "training_days": 4,
+  "targets": {
+    "daily_kcal": 2310,
+    "protein_g": 138,
+    "fat_g": 69,
+    "carb_g": 284,
+    "calculated_by": "fitness_lib.py Mifflin-St Jeor",
+    "calculated_at": "2026-10-16"
+  },
+  "notes": "周练4天为假设值，如有出入重跑 calories 178 86 26 male fat_loss N"
+}
