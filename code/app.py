@@ -1011,6 +1011,10 @@ class H(BaseHTTPRequestHandler):
         with db() as conn:
             if action == "delete":
                 conn.execute("DELETE FROM meals WHERE id=?", (rid,))
+                try:
+                    os.remove(os.path.join(DATA, "meals", "record_%d.jpg" % rid))  # 照片随记录一起删
+                except OSError:
+                    pass
                 return self._json(200, {"ok": True, "msg": "已删除"})
             if action == "edit":
                 sets, vals = [], []
