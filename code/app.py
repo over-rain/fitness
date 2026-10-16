@@ -188,7 +188,7 @@ def infer_meal_type():
 
 # ---------------------------------------------------------------- 模型调用
 
-def llm_analyze(text, image_b64, recent=None, extra="", llm_cfg=None):
+def llm_analyze(text, image_b64, recent=None, extra="", llm_cfg=None, timeout=120):
     """识别食物+判断意图；mock 模式返回固定结果。协议按配置：openai(默认) / anthropic
     llm_cfg：可选的独立模型配置（文字通道快模型），缺省用主配置"""
     if CFG.get("mock"):
@@ -205,7 +205,7 @@ def llm_analyze(text, image_b64, recent=None, extra="", llm_cfg=None):
         ctx += "\n用户输入：" + text
     ctx += extra
     if llm.get("protocol") == "anthropic":
-        return _anthropic_analyze(text, image_b64, llm, ctx)
+        return _anthropic_analyze(text, image_b64, llm, ctx, timeout=timeout)
     content = []
     if image_b64:
         content.append({"type": "image_url",
@@ -223,29 +223,51 @@ def llm_analyze(text, image_b64, recent=None, extra="", llm_cfg=None):
     return _extract_json(raw)
 
 
-def _anthropic_analyze(text, image_b64, llm, extra=""):
+def _anthropic_analyze(text, image_b64, llm, extra="", timeout=120):
     """Anthropic /v1/messages 协议（如火山方舟 coding 网关）。
-    思考型模型可能把 max_tokens 花在思考上导致正文为空 → 空则重试一次。"""
+    用流式请求：思考型模型思考阶段持续吐 delta，连接不会因长时间无响应被网关掐掉
+    （非流式在网关高峰会被掐 → 用户端 TimeoutError）。
+    思考占满 max_tokens 导致正文为空 → 重试一次。"""
     content = []
     if image_b64:
         content.append({"type": "image",
                         "source": {"type": "base64", "media_type": "image/jpeg", "data": image_b64}})
     content.append({"type": "text", "text": ANALYZE_PROMPT + extra})
-    last = {}
+    last_err = ""
     for _ in range(2):
-        payload = json.dumps({"model": llm["model"], "max_tokens": 6000,
+        payload = json.dumps({"model": llm["model"], "max_tokens": 6000, "stream": True,
                               "messages": [{"role": "user", "content": content}]}).encode("utf-8")
         req = urllib.request.Request(
             llm["base_url"].rstrip("/") + "/v1/messages", data=payload,
             headers={"Content-Type": "application/json", "x-api-key": llm["api_key"],
-                     "anthropic-version": "2023-06-01"})
-        with urllib.request.urlopen(req, timeout=120) as resp:
-            last = json.loads(resp.read().decode("utf-8"))
-        raw = "".join(b.get("text", "") for b in last.get("content", []) if b.get("type") == "text")
+                     "anthropic-version": "2023-06-01", "accept": "text/event-stream"})
+        raw = ""
+        try:
+            with urllib.request.urlopen(req, timeout=timeout) as resp:
+                for rawline in resp:
+                    line = rawline.decode("utf-8", "replace").strip()
+                    if not line.startswith("data:"):
+                        continue
+                    data = line[5:].strip()
+                    if data == "[DONE]":
+                        break
+                    try:
+                        ev = json.loads(data)
+                    except ValueError:
+                        continue
+                    if ev.get("type") == "content_block_delta":
+                        d = ev.get("delta", {})
+                        if d.get("type") == "text_delta":
+                            raw += d.get("text", "")
+        except urllib.error.HTTPError:
+            raise  # 4xx/5xx 交给上层
+        except Exception as ex:
+            last_err = repr(ex)
+            continue  # 网络中断/超时 → 重试一次
         if raw.strip():
             return _extract_json(raw)
-    raise ValueError(f"模型只输出思考未给正文（stop={last.get('stop_reason')}, "
-                     f"usage={last.get('usage')}），请重试")
+        last_err = "模型只输出思考未给正文"
+    raise ValueError(f"两次尝试均未得到正文（{last_err}），请稍后重试")
 
 
 def _extract_json(raw):
@@ -641,10 +663,15 @@ async function sendText(){
  const t=$("text").value.trim();if(!t)return;
  setLoading("识别中…");
  try{const j=await api("/api/meal",{method:"POST",headers:{"Content-Type":"application/json"},
-   body:JSON.stringify({user:user,text:t})});
+   body:JSON.stringify({user:user,text:t})},240000);
   if(j.reply&&j.reply.indexOf("没识别出")>=0){showErr(j.reply);}else{showOk(j.reply);refresh();}
   $("text").value="";
- }catch(e){showErr(e.message);}
+ }catch(e){showErr(friendly(e.message));}
+}
+function friendly(m){
+ if(/timed out|abort/i.test(m))return "网关高峰无响应（已等待超时）。稍后重试；长语音建议拆成按餐短句，更快更稳";
+ if(/api_key/i.test(m))return m;
+ return m;
 }
 $("text").addEventListener("keydown",e=>{if(e.key==="Enter"){e.preventDefault();sendText();}});
 $("bSend").onclick=sendText;
@@ -982,13 +1009,16 @@ class H(BaseHTTPRequestHandler):
         recent = [{"id": r["id"], "meal_type": r["meal_type"], "food": r["food"], "kcal": r["kcal"]}
                   for r in pre["records"]][-5:]  # 上下文防重复，但不宜过长（思考型模型越慢）
         # 双通道：纯文字记录可走快模型（config.text_llm），拍照走主视觉模型
+        # 快模型提取不到（复杂碎片输入）→ 自动升级 glm 主模型再判一次
         if not image_b64 and CFG.get("text_llm"):
-            analysis = llm_analyze(text, None, recent, llm_cfg=CFG["text_llm"])
+            analysis = llm_analyze(text, None, recent, llm_cfg=CFG["text_llm"], timeout=90)
+            if not (analysis.get("items") or []):
+                analysis = llm_analyze(text, None, recent, timeout=120)
         else:
             analysis = llm_analyze(text, image_b64, recent)
         items = analysis.get("items") or []
         if not items:
-            return self._json(200, {"reply": "🤔 没识别出食物。说清楚点或拍清楚点再试一次。", "items": []})
+            return self._json(200, {"reply": "🤔 没有需要新增的记录——可能这段内容都已经记过啦。可在下方明细核对；有漏掉的换个说法补充。", "items": []})
 
         # 更正路径：改写已有记录，不新增
         if analysis.get("action") == "correct":
