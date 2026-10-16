@@ -56,6 +56,10 @@ ANALYZE_PROMPT = (
     "④ 若用户明确说明照片是某一餐吃剩的部分、要求扣回 → 输出负数热量项用于抵扣"
     "（food 加前缀「扣回:」，kcal/kcal_low/kcal_high/protein_g/fat_g/carb_g 均为负值，portion 写剩余比例）。"
     "热量区间 ±20%。识别不到食物 → {\"action\":\"record\",\"id\":0,\"items\":[]}。"
+    "⑤ 输入可能是语音转写的对话碎片（含寒暄/疑问/过程描述）：只提取**确定吃了**的食物，"
+    "忽略闲聊和无法确定是否入口的内容；【今日已有记录】里已存在的同餐次同食物不要重复输出。"
+    "⑥ 「晚上还有八只虾」「热一下」「煮熟了」「不热了直接吃」这类描述 = 现在就吃这些剩菜，"
+    "正常提取为当前餐次的记录，不要因为是对话形式而跳过。"
 )
 
 # ---------------------------------------------------------------- 配置
@@ -228,7 +232,7 @@ def _anthropic_analyze(text, image_b64, llm, extra=""):
     content.append({"type": "text", "text": ANALYZE_PROMPT + extra})
     last = {}
     for _ in range(2):
-        payload = json.dumps({"model": llm["model"], "max_tokens": 3000,
+        payload = json.dumps({"model": llm["model"], "max_tokens": 6000,
                               "messages": [{"role": "user", "content": content}]}).encode("utf-8")
         req = urllib.request.Request(
             llm["base_url"].rstrip("/") + "/v1/messages", data=payload,
@@ -975,7 +979,7 @@ class H(BaseHTTPRequestHandler):
             return self._json(503, {"error": "未配置 api_key：编辑 code/config.json 填入后重启，或临时把 mock 设为 true"})
         pre = today_summary(user)
         recent = [{"id": r["id"], "meal_type": r["meal_type"], "food": r["food"], "kcal": r["kcal"]}
-                  for r in pre["records"]][-10:]
+                  for r in pre["records"]][-5:]  # 上下文防重复，但不宜过长（思考型模型越慢）
         analysis = llm_analyze(text, image_b64, recent)
         items = analysis.get("items") or []
         if not items:
