@@ -369,6 +369,28 @@ INDEX = r"""<!doctype html><html lang="zh"><head>
 <meta name="apple-mobile-web-app-capable" content="yes">
 <title>减肥管家</title>
 <style>
+:root{
+ --color-page-bg:#E8F2FC;
+ --color-card-bg:rgba(255,255,255,0.72);
+ --color-card-border:rgba(255,255,255,0.85);
+ --card-backdrop-blur:12px;
+ --shadow-card-1:rgba(150,180,220,0.15);
+ --shadow-card-2:rgba(150,180,220,0.08);
+ --shadow-card:0 4px 16px var(--shadow-card-1),0 1px 4px var(--shadow-card-2);
+ --color-primary:#3B88ED;
+ --text-heading:#1A3050;
+ --text-value-lg:#163A78;
+ --text-body:#546278;
+ --color-divider:rgba(180,205,235,0.3);
+ --ring-bg:#E5EEF9;
+ --ring-progress:var(--color-primary);
+ --radius-card:24px;
+ --radius-btn:16px;
+ --radius-tag:999px;
+ --gap-card:16px;
+ --padding-card-image:8px;
+ --padding-card-normal:24px;
+}
  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
  body{font-family:system-ui,-apple-system,"PingFang SC",sans-serif;max-width:430px;margin:0 auto;padding:14px 12px 30px;background:#eef1f4;color:#191c1f}
  .hd{display:flex;align-items:center;justify-content:space-between;margin:2px 2px 12px}
@@ -403,35 +425,32 @@ INDEX = r"""<!doctype html><html lang="zh"><head>
  #avmenu button{display:block;width:100%;border:0;background:none;padding:11px 30px;font-size:14.5px}
  #avmenu button.on{background:#f0fdf4;color:#16a34a;font-weight:700}
  #avImg{width:100%;max-height:300px;object-fit:cover;display:block;background:#dde2e6}
- .avwrap{padding:12px;display:flex;flex-direction:column;gap:16px}
- .avc{background:rgba(255,255,255,.72);border-radius:24px;border:1px solid rgba(255,255,255,.85);padding:24px;
-  box-shadow:0 4px 16px rgba(150,180,220,.15),0 1px 4px rgba(150,180,220,.08);
-  backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px)}
- .avimgc{padding:8px}
+ .avwrap{padding:12px;display:flex;flex-direction:column;gap:var(--gap-card)}
+ .avc{background:var(--color-card-bg);border-radius:var(--radius-card);border:1px solid var(--color-card-border);padding:var(--padding-card-normal);
+  box-shadow:var(--shadow-card);
+  backdrop-filter:blur(var(--card-backdrop-blur));-webkit-backdrop-filter:blur(var(--card-backdrop-blur))}
+ .avimgc{padding:var(--padding-card-image)}
  #avImg{width:100%;border-radius:16px;display:block;max-height:320px;object-fit:cover}
  .kchead{margin-bottom:2px}
- .kctitle{font-size:15px;font-weight:500;color:#1A3050}
+ .kctitle{font-size:15px;font-weight:500;color:var(--text-heading)}
  .kctagrow{display:flex;justify-content:flex-end;margin-top:10px}
- .kctag{background:#3B88ED;color:#fff;border-radius:10px;padding:5px 12px;font-size:12.5px}
- .avmrow3{display:flex;gap:16px}
- .avitem{padding:10px 2px;border-bottom:1px solid rgba(180,205,235,.3);display:flex;justify-content:space-between;gap:8px;align-items:baseline}
+ .kctag{background:var(--color-primary);color:#fff;border-radius:var(--radius-tag);padding:5px 12px;font-size:12.5px}
+ .avmrow3{display:flex;gap:var(--gap-card)}
+ .avitem{padding:10px 2px;border-bottom:1px solid var(--color-divider);display:flex;justify-content:space-between;gap:8px;align-items:baseline}
  .avitem:last-child{border-bottom:0}
- .avname b{font-size:14.5px}
- .avk{color:#3B88ED;white-space:nowrap;font-size:13.5px;font-weight:600}
- .avbig{font-size:34px;font-weight:600;color:#163A78}
- .avbig small{font-size:13px;color:#546278;font-weight:500;margin-left:2px}
- .avmacros{display:flex;margin-top:10px}
- .avmacros div{flex:1;text-align:center;border-right:1px solid #f0f2f4}
- .avmacros div:last-child{border-right:0}
- .avmacros i{font-style:normal;display:block;font-size:18px;font-weight:700}
- .avmacros span{font-size:11.5px;color:#8a9299}
- .mcards{display:flex;gap:9px;margin-top:10px}
+ .avname b{font-size:14.5px;color:var(--text-heading)}
+ .avk{color:var(--color-primary);white-space:nowrap;font-size:13.5px;font-weight:600}
+ .avbig{font-size:34px;font-weight:600;color:var(--text-value-lg)}
+ .avbig small{font-size:13px;color:var(--text-body);font-weight:500;margin-left:2px}
+ .mcards{display:flex;gap:var(--gap-card);margin-top:10px}
  .mcd{flex:1;min-width:0;padding:14px 12px}
  .mcrow{display:flex;align-items:center;gap:10px}
  .mcol{flex:1;text-align:left;min-width:0}
- .mc-l{font-size:13.5px;font-weight:600;color:#1A3050}
- .mc-v{font-size:16px;font-weight:600;color:#163A78;margin-top:2px}
- .mc-n{font-size:11.5px;color:#546278;margin-top:10px;padding-top:8px;border-top:1px solid rgba(180,205,235,.3)}
+ .mc-l{font-size:13.5px;font-weight:600;color:var(--text-heading)}
+ .mc-v{font-size:16px;font-weight:600;color:var(--text-value-lg);margin-top:2px}
+ .mc-n{font-size:11.5px;color:var(--text-body);margin-top:10px;padding-top:8px;border-top:1px solid var(--color-divider)}
+ .ring-track{stroke:var(--ring-bg)}
+ .ring-fill{stroke:var(--ring-progress)}
  .mc-n b{color:#163A78;font-size:12.5px}
  .avbtns{position:fixed;bottom:0;left:0;right:0;margin:0 auto;max-width:430px;display:flex;gap:9px;padding:10px 12px calc(10px + env(safe-area-inset-bottom));background:#fff;box-shadow:0 -2px 10px rgba(0,0,0,.06);z-index:45}
  #avFix:disabled,#avSave:disabled{opacity:.55}
@@ -525,12 +544,6 @@ INDEX = r"""<!doctype html><html lang="zh"><head>
  body.theme-glass #avBack,body.theme-glass #avMeal{background:rgba(255,255,255,.5)}
  body.theme-glass #avmenu{background:rgba(255,255,255,.75);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px)}
  body.theme-glass #avmenu button.on{background:rgba(190,228,255,.6);color:#1d6fa5}
- body.theme-glass .avcard{background:rgba(255,255,255,.40);border:1px solid rgba(255,255,255,.70);
-  backdrop-filter:blur(24px) saturate(1.6);-webkit-backdrop-filter:blur(24px) saturate(1.6)}
- body.theme-glass .avbig{color:#1d6fa5}
- body.theme-glass .avitem{border-bottom:1px solid rgba(255,255,255,.55)}
- body.theme-glass .avmacros div{border-right:1px solid rgba(255,255,255,.6)}
- body.theme-glass .avmacros i{color:#1d3d54}
  body.theme-glass .avbtns{background:rgba(255,255,255,.55);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px)}
  body.theme-glass #avFix{background:rgba(255,255,255,.5);border-color:#57b8f2;color:#1d6fa5}
  body.theme-glass #avSave{background:linear-gradient(135deg,#3ea0ff,#6fc3ff)}
@@ -925,22 +938,22 @@ function renderAv(){
   $("avKcal").innerHTML="<div class='kchead'><div class='kctitle'>这餐热量</div></div>"+
    "<div class='avbig'>"+tot("kcal")+" <small>千卡</small></div>"+
    "<div class='kctagrow'><div class='kctag'>今天 "+avMeal+"</div></div>";
-  $("avM").innerHTML=mcard("蛋白质",tot("protein_g"),avDay.protein,avTarget.protein,"#2f8bff")+
-   mcard("脂肪",tot("fat_g"),avDay.fat,avTarget.fat,"#8fc9ff")+
-   mcard("碳水",tot("carb_g"),avDay.carb,avTarget.carb,"#1b4b9e");
+  $("avM").innerHTML=mcard("蛋白质",tot("protein_g"),avDay.protein,avTarget.protein)+
+   mcard("脂肪",tot("fat_g"),avDay.fat,avTarget.fat)+
+   mcard("碳水",tot("carb_g"),avDay.carb,avTarget.carb);
  }
  let h="";
  for(const it of avItems)h+="<div class='avitem'><div class='avname'><b>"+esc(it.food)+"</b> <span class='muted'>"+
   esc(it.portion||"")+"</span> "+esc(it.note||"")+"</div><div class='avk'>"+it.kcal+" 千卡</div></div>";
  $("avItems").innerHTML=h||"<div class='avload'><span class='spin'></span> 识别中…</div>";
 }
-function mcard(label,mealVal,dayVal,target,color){
+function mcard(label,mealVal,dayVal,target){
  const pct=target>0?Math.min(100,Math.round(dayVal/target*100)):0;
  const R=26,C=2*Math.PI*R,off=C*(1-pct/100);
  return "<div class='avc mcd'><div class='mcrow'>"+
   "<svg width='64' height='64' viewBox='0 0 64 64'>"+
-  "<circle cx='32' cy='32' r='"+R+"' fill='none' stroke='rgba(180,205,235,.35)' stroke-width='7'/>"+
-  "<circle cx='32' cy='32' r='"+R+"' fill='none' stroke='"+color+"' stroke-width='7' stroke-linecap='round' "+
+  "<circle class='ring-track' cx='32' cy='32' r='"+R+"' fill='none' stroke-width='7'/>"+
+  "<circle class='ring-fill' cx='32' cy='32' r='"+R+"' fill='none' stroke-width='7' stroke-linecap='round' "+
   "stroke-dasharray='"+C+"' stroke-dashoffset='"+off+"' transform='rotate(-90 32 32)'/>"+
   "<text x='32' y='37' text-anchor='middle' font-size='13.5' font-weight='700' fill='#163A78'>"+pct+"%</text></svg>"+
   "<div class='mcol'><div class='mc-l'>"+label+"</div><div class='mc-v'>"+mealVal+"g</div></div></div>"+
