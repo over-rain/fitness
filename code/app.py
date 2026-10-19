@@ -404,13 +404,14 @@ INDEX = r"""<!doctype html><html lang="zh"><head>
  #avmenu button.on{background:#f0fdf4;color:#16a34a;font-weight:700}
  #avImg{width:100%;max-height:300px;object-fit:cover;display:block;background:#dde2e6}
  .avwrap{padding:12px;display:flex;flex-direction:column;gap:16px}
- .avc{background:rgba(255,255,255,.72);border-radius:24px;border:1px solid rgba(255,255,255,.85);
+ .avc{background:rgba(255,255,255,.72);border-radius:24px;border:1px solid rgba(255,255,255,.85);padding:24px;
   box-shadow:0 4px 16px rgba(150,180,220,.15),0 1px 4px rgba(150,180,220,.08);
   backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px)}
  .avimgc{padding:8px}
  #avImg{width:100%;border-radius:16px;display:block;max-height:320px;object-fit:cover}
- .kchead{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:4px}
- .kctitle{font-size:14px;font-weight:700;color:#1A3050}
+ .kchead{margin-bottom:2px}
+ .kctitle{font-size:15px;font-weight:500;color:#1A3050}
+ .kctagrow{display:flex;justify-content:flex-end;margin-top:10px}
  .kctag{background:#3B88ED;color:#fff;border-radius:10px;padding:5px 12px;font-size:12.5px}
  .avmrow3{display:flex;gap:16px}
  .avitem{padding:10px 2px;border-bottom:1px solid rgba(180,205,235,.3);display:flex;justify-content:space-between;gap:8px;align-items:baseline}
@@ -425,7 +426,7 @@ INDEX = r"""<!doctype html><html lang="zh"><head>
  .avmacros i{font-style:normal;display:block;font-size:18px;font-weight:700}
  .avmacros span{font-size:11.5px;color:#8a9299}
  .mcards{display:flex;gap:9px;margin-top:10px}
- .mcd{flex:1;min-width:0;padding:12px 10px}
+ .mcd{flex:1;min-width:0;padding:14px 12px}
  .mcrow{display:flex;align-items:center;gap:10px}
  .mcol{flex:1;text-align:left;min-width:0}
  .mc-l{font-size:13.5px;font-weight:600;color:#1A3050}
@@ -921,8 +922,9 @@ function renderAv(){
  $("avKcal").style.display=has?"block":"none";
  $("avM").style.display=has?"flex":"none";
  if(has){
-  $("avKcal").innerHTML="<div class='kchead'><div class='kctitle'>这餐热量</div><div class='kctag'>今天 "+avMeal+"</div></div>"+
-   "<div class='avbig'>"+tot("kcal")+" <small>千卡</small></div>";
+  $("avKcal").innerHTML="<div class='kchead'><div class='kctitle'>这餐热量</div></div>"+
+   "<div class='avbig'>"+tot("kcal")+" <small>千卡</small></div>"+
+   "<div class='kctagrow'><div class='kctag'>今天 "+avMeal+"</div></div>";
   $("avM").innerHTML=mcard("蛋白质",tot("protein_g"),avDay.protein,avTarget.protein,"#2f8bff")+
    mcard("脂肪",tot("fat_g"),avDay.fat,avTarget.fat,"#8fc9ff")+
    mcard("碳水",tot("carb_g"),avDay.carb,avTarget.carb,"#1b4b9e");
