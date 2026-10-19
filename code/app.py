@@ -504,8 +504,7 @@ INDEX = r"""<!doctype html><html lang="zh"><head>
  .gsug{font-size:12px;color:#8a9299;margin:0 2px 10px}
  .mrow{position:relative;overflow:hidden;border-radius:14px;margin-bottom:9px;box-shadow:0 1px 4px rgba(16,24,40,.05)}
  .mrow:last-child{margin-bottom:0}
- .dz{position:absolute;top:4px;bottom:4px;width:70px;display:flex;align-items:center;justify-content:center}
- .dz.l{left:4px}.dz.r{right:4px}
+ .dz{position:absolute;top:4px;bottom:4px;right:4px;width:70px;display:flex;align-items:center;justify-content:center}
  .delzone2{width:100%;height:42px;border:0;background:#f8a8a8;color:#fff;font-size:13px;font-weight:600;border-radius:999px}
  .mmain{position:relative;display:flex;align-items:center;gap:10px;padding:8px;background:#fff;border-radius:14px;transition:transform .18s;touch-action:pan-y;user-select:none}
  .thumb{width:48px;height:48px;border-radius:12px;object-fit:cover;flex:none;background:#f0f2f4}
@@ -695,8 +694,7 @@ async function refresh(){
     "<div class='gsug'>热量建议："+sug(g.m)+" kcal</div>";
    for(const r of g.items){
     h+="<div class='mrow' data-id='"+r.id+"'>"+
-     "<div class='dz l'><button class='delzone2' data-del='"+r.id+"'>删除</button></div>"+
-     "<div class='dz r'><button class='delzone2' data-del='"+r.id+"'>删除</button></div>"+
+     "<div class='dz'><button class='delzone2' data-del='"+r.id+"'>删除</button></div>"+
      "<div class='mmain'>"+
      (r.photo?"<img class='thumb' src='/photo/"+r.id+"' alt=''>":"<div class='thumb ph'>🍳</div>")+
      "<div class='mname'>"+esc(r.food)+(r.note?"<div class='msub'>"+esc(r.note)+"</div>":"")+"</div>"+
@@ -708,7 +706,7 @@ async function refresh(){
   bindSwipe($("list"));
  }catch(e){toast("加载失败："+e.message);}
 }
-let openId=null,openDir="R",suppressClick=false,_recs={};
+let openId=null,suppressClick=false,_recs={};
 function closeOpen(exceptId){document.querySelectorAll("#list .mrow").forEach(row=>{
  if(+row.dataset.id!==exceptId)row.querySelector(".mmain").style.transform="";});}
 function bindSwipe(list){
@@ -722,18 +720,17 @@ function bindSwipe(list){
     moved=true;suppressClick=true;setTimeout(()=>suppressClick=false,350);
     try{main.setPointerCapture(e.pointerId);}catch(_){}}
    if(!moved)return;
-   const base=openId===rid?(openDir==="L"?-72:72):0;
-   main.style.transform="translateX("+Math.max(-72,Math.min(72,base+dx))+"px)";});
+   const base=openId===rid?-72:0;
+   main.style.transform="translateX("+Math.max(-72,Math.min(0,base+dx))+"px)";});
   const end=e=>{if(!drag)return;drag=false;main.style.transition="";
    if(cap){try{main.releasePointerCapture(e.pointerId);}catch(_){}}
    if(!moved){if(openId===rid){main.style.transform="";openId=null;}return;}
-   const t=(openId===rid?(openDir==="L"?-72:72):0)+(e.clientX-sx);
-   if(Math.abs(t)>36){closeOpen(rid);openDir=t<0?"L":"R";
-    main.style.transform="translateX("+(openDir==="L"?-72:72)+"px)";openId=rid;}
+   const t=(openId===rid?-72:0)+(e.clientX-sx);
+   if(t<-36){closeOpen(rid);main.style.transform="translateX(-72px)";openId=rid;}
    else{main.style.transform="";if(openId===rid)openId=null;}};
   main.addEventListener("pointerup",end);
   main.addEventListener("pointercancel",()=>{drag=false;main.style.transition="";
-   if(openId===rid)main.style.transform="translateX("+(openDir==="L"?-72:72)+"px)";else main.style.transform="";});
+   main.style.transform=openId===rid?"translateX(-72px)":"";});
   main.addEventListener("click",e=>{if(suppressClick||drag||moved)return;
    if(e.target.closest(".kcell"))editId(rid,_recs[rid].kcal);});
   row.querySelectorAll(".delzone2").forEach(b=>b.addEventListener("click",()=>delId(rid)));
