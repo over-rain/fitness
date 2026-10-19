@@ -683,6 +683,9 @@ $("u1").textContent="🧑 邶风";$("u2").textContent="👩 gagayouna";
 $("u1").onclick=()=>{user="beifeng";localStorage.setItem("fg_user",user);paintSeg();clearReply();refresh();if($("mback").style.display==="flex")loadProfile();};
 $("u2").onclick=()=>{user="gagayouna";localStorage.setItem("fg_user",user);paintSeg();clearReply();refresh();if($("mback").style.display==="flex")loadProfile();};
 function clearReply(){const el=$("reply");el.className="";el.textContent="";}
+function showBack(id){const el=$(id);el.style.display="flex";el.classList.remove("closing");}
+function hideBack(id){const el=$(id);el.classList.add("closing");
+ setTimeout(()=>{el.style.display="none";el.classList.remove("closing");},240);}
 function openSettings(){showBack("mback");loadProfile();}
 function closeSettings(){hideBack("mback");}
 $("gear").onclick=openSettings;
