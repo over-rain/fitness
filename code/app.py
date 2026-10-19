@@ -122,7 +122,7 @@ def init_db():
                 created_at TEXT
             )"""
         )
-        for col in ("fat_g INTEGER", "carb_g INTEGER"):  # 老库迁移：宏量两列
+        for col in ("fat_g INTEGER", "carb_g INTEGER", "portion TEXT"):  # 老库迁移：宏量+份量
             try:
                 conn.execute("ALTER TABLE meals ADD COLUMN " + col)
             except sqlite3.OperationalError:
@@ -298,12 +298,12 @@ def insert_meals(user_id, items):
     with db() as conn:
         for it in items:
             cur = conn.execute(
-                "INSERT INTO meals (user_id,date,meal_type,food,kcal,kcal_low,kcal_high,protein_g,note,created_at,fat_g,carb_g)"
-                " VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
+                "INSERT INTO meals (user_id,date,meal_type,food,kcal,kcal_low,kcal_high,protein_g,note,created_at,fat_g,carb_g,portion)"
+                " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
                 (user_id, date, it.get("meal_type") or meal_type, it.get("food", "未知"),
                  it.get("kcal"), it.get("kcal_low"), it.get("kcal_high"),
                  it.get("protein_g"), it.get("note", ""), datetime.now().isoformat(timespec="seconds"),
-                 it.get("fat_g"), it.get("carb_g")))
+                 it.get("fat_g"), it.get("carb_g"), it.get("portion", "")))
             ids.append(cur.lastrowid)
     return ids
 
@@ -313,7 +313,7 @@ def today_summary(user_id):
     tgt = profile_targets(user_id)
     with db() as conn:
         rows = [dict(r) for r in conn.execute(
-            "SELECT id,meal_type,food,kcal,kcal_low,kcal_high,protein_g,note,fat_g,carb_g FROM meals"
+            "SELECT id,meal_type,food,kcal,kcal_low,kcal_high,protein_g,note,fat_g,carb_g,portion FROM meals"
             " WHERE user_id=? AND date=? ORDER BY id", (user_id, date))]
         for r in rows:
             r["photo"] = 1 if os.path.exists(os.path.join(DATA, "meals", "record_%d.jpg" % r["id"])) else 0
@@ -425,6 +425,29 @@ INDEX = r"""<!doctype html><html lang="zh"><head>
  #fixPhotoBtn{border:1.5px solid #dfe4e8;background:#fafbfc;border-radius:10px;padding:8px 10px;font-size:13px}
  #fixThumb{width:42px;height:42px;border-radius:8px;object-fit:cover}
  .avload{padding:14px 0;text-align:center;color:#5c6670;font-size:13.5px}
+ /* ---- 编辑抽屉 & 删除确认 ---- */
+ .mback.up{align-items:flex-end;padding:0}
+ .sheet{background:#fff;border-radius:22px 22px 0 0;max-width:430px;width:100%;padding:16px 16px calc(16px + env(safe-area-inset-bottom));
+  transform:translateY(100%);transition:transform .28s cubic-bezier(.2,.8,.2,1)}
+ .mback.up.open .sheet{transform:translateY(0)}
+ .etitle{text-align:center;font-size:16px;font-weight:700;margin-bottom:12px}
+ .ehead{display:flex;align-items:center;gap:10px;margin-bottom:6px}
+ .ethumb{width:56px;height:56px;border-radius:14px;object-fit:cover;background:#f0f2f4;cursor:pointer}
+ .ethumb.ph{display:flex;align-items:center;justify-content:center;font-size:22px}
+ .ehint{font-size:11.5px;color:#8a9299}
+ .elabel{font-size:12.5px;color:#8a9299;margin:9px 2px 5px}
+ .einput{width:100%;box-sizing:border-box;border:1.5px solid #dfe4e8;border-radius:12px;padding:11px 12px;font-size:14.5px;outline:none;background:#fafbfc}
+ .einput:focus{border-color:#57b8f2;background:#fff}
+ .pills{display:flex;gap:8px;flex-wrap:wrap}
+ .pills button{padding:8px 16px;border-radius:999px;border:1.5px solid #dfe4e8;background:#fafbfc;font-size:13.5px;color:#555}
+ .pills button.on{border-color:#57b8f2;background:#eaf6ff;color:#1d6fa5;font-weight:600}
+ .ebtns{display:flex;gap:10px;margin-top:14px}
+ .ebtns .ghost{flex:1;border:0;background:#f0f2f4;border-radius:12px;padding:12px;font-size:15px;color:#555}
+ .ebtns .primary{flex:2;border:0;background:#1c7ed6;color:#fff;border-radius:12px;padding:12px;font-size:15px;font-weight:600}
+ .ebtns .danger{background:#f87171}
+ .dtext{text-align:center;font-size:14.5px;padding:6px 0 14px}
+ @keyframes bump{30%{transform:scale(1.1);color:#16a34a}}
+ .num.bump{animation:bump .5s}
  /* ===== 玻璃冰块主题（互联网清新）=====
     body.theme-glass 时整体覆盖为淡蓝渐变底 + 磨砂半透明卡片 + 冰蓝主色 */
  body.theme-glass{background:linear-gradient(165deg,#d8ecfb 0%,#e9f4fb 45%,#e3f2f5 100%);color:#203442}
@@ -490,6 +513,13 @@ INDEX = r"""<!doctype html><html lang="zh"><head>
  body.theme-glass .gsug{color:#7d95ad}
  body.theme-glass .chev{color:#3ea0ff}
  body.theme-glass .msub{color:#7d95ad}
+ body.theme-glass .sheet{background:rgba(246,250,253,.82);backdrop-filter:blur(20px) saturate(1.5);-webkit-backdrop-filter:blur(20px) saturate(1.5);border:1px solid rgba(255,255,255,.65)}
+ body.theme-glass .einput{background:rgba(255,255,255,.6);border-color:rgba(255,255,255,.8)}
+ body.theme-glass .pills button{background:rgba(255,255,255,.5);border-color:rgba(255,255,255,.8);color:#4a6b80}
+ body.theme-glass .pills button.on{background:#eaf6ff;border-color:#57b8f2;color:#1d6fa5}
+ body.theme-glass .ebtns .primary{background:linear-gradient(135deg,#3ea0ff,#6fc3ff)}
+ body.theme-glass .ebtns .ghost{background:rgba(255,255,255,.5)}
+ body.theme-glass .ebtns .danger{background:#f9a8a8}
  .num{font-size:34px;font-weight:800;letter-spacing:-.5px;margin:2px 0 10px}
  .num small{font-size:14px;color:#8a9299;font-weight:500;margin-left:3px}
  .dinnerline{display:none;margin-top:9px;padding-top:8px;border-top:1px dashed #e6eaed;font-size:12.5px;color:#8a9299}
@@ -602,6 +632,32 @@ INDEX = r"""<!doctype html><html lang="zh"><head>
    <div class="muted" style="padding:26px 0;text-align:center">暂无可配置项，敬请期待</div>
   </div>
  </div></div>
+<div class="mback up" id="editBack" style="display:none">
+ <div class="sheet">
+  <div class="mhead"><b>编辑食物</b><button id="eClose">✕</button></div>
+  <div class="ehead">
+   <img id="eThumb" class="ethumb" alt="" style="display:none">
+   <div class="ethumb ph" id="eThumbPh">🍳</div>
+   <div class="ehint">点头像可更换这张照片</div>
+   <input type="file" id="ePhoto" accept="image/*" style="display:none">
+  </div>
+  <div class="elabel">食物名称</div>
+  <input class="einput" id="eFood">
+  <div class="elabel">食用克重（如 120g，可留空）</div>
+  <input class="einput" id="ePortion">
+  <div class="elabel">热量 kcal</div>
+  <input class="einput" id="eKcal" type="number">
+  <div class="elabel">蛋白 g（可选）</div>
+  <input class="einput" id="eProtein" type="number">
+  <div class="elabel">餐段</div>
+  <div class="pills" id="ePills"></div>
+  <div class="ebtns"><button class="ghost" id="eCancel">取消</button><button class="primary" id="eSave">保存修改</button></div>
+ </div></div>
+<div class="mback" id="delBack" style="display:none">
+ <div class="modal" style="max-width:320px">
+  <div class="etitle">确定删除这条食物记录吗？</div>
+  <div class="ebtns"><button class="ghost" id="dCancel">取消</button><button class="primary danger" id="dOk">删除</button></div>
+ </div></div>
 <div id="toast"></div>
 <script>
 const $=id=>document.getElementById(id);
@@ -697,7 +753,8 @@ async function refresh(){
      "<div class='dz'><button class='delzone2' data-del='"+r.id+"'>删除</button></div>"+
      "<div class='mmain'>"+
      (r.photo?"<img class='thumb' src='/photo/"+r.id+"' alt=''>":"<div class='thumb ph'>🍳</div>")+
-     "<div class='mname'>"+esc(r.food)+(r.note?"<div class='msub'>"+esc(r.note)+"</div>":"")+"</div>"+
+     "<div class='mname'>"+esc(r.food)+"<div class='msub'>"+
+     [r.portion,r.note].filter(Boolean).map(esc).join(" · ")+"</div></div>"+
      "<div class='kcell'><b>"+r.kcal+"</b> 千卡<span class='chev'>›</span></div></div></div>";
    }
    h+="</div>";
@@ -708,7 +765,8 @@ async function refresh(){
 }
 let openId=null,suppressClick=false,_recs={};
 function closeOpen(exceptId){document.querySelectorAll("#list .mrow").forEach(row=>{
- if(+row.dataset.id!==exceptId)row.querySelector(".mmain").style.transform="";});}
+ if(+row.dataset.id!==exceptId)row.querySelector(".mmain").style.transform="";});
+ if(exceptId==null)openId=null;}
 function bindSwipe(list){
  list.querySelectorAll(".mrow").forEach(row=>{
   const rid=+row.dataset.id,main=row.querySelector(".mmain");
@@ -742,7 +800,7 @@ async function sendText(){
  setLoading("识别中…");
  try{const j=await api("/api/meal",{method:"POST",headers:{"Content-Type":"application/json"},
    body:JSON.stringify({user:user,text:t})},240000);
-  if(j.reply&&j.reply.indexOf("没识别出")>=0){showErr(j.reply);}else{showOk(j.reply);refresh();}
+  if(j.reply&&j.reply.indexOf("没识别出")>=0){showErr(j.reply);}else{showOk(j.reply);bump();refresh();}
   $("text").value="";
  }catch(e){showErr(friendly(e.message));}
 }
@@ -893,12 +951,61 @@ $("photo").addEventListener("change",async e=>{
  }catch(err){avDone();toast("识别失败："+err.message);closeAv();}
  avBusyUI(false);avBusy=false;
 });
-async function delId(id){try{await api("/api/correct",{method:"POST",headers:{"Content-Type":"application/json"},
-  body:JSON.stringify({id:id,action:"delete"})});toast("已删除");refresh();}catch(e){toast("失败："+e.message);}}
-async function editId(id,kcal){
- const v=prompt("改为多少 kcal？",kcal);if(v===null)return;
+// ---- 编辑抽屉 & 删除确认 ----
+let editId0=null,editB64=null,editBusy=false,delId0=null;
+function openEdit(id){
+ const r=_recs[id];if(!r)return;editId0=id;editB64=null;
+ if(r.photo){$("eThumb").src="/photo/"+id;$("eThumb").style.display="block";$("eThumbPh").style.display="none";}
+ else{$("eThumb").style.display="none";$("eThumbPh").style.display="flex";}
+ $("eFood").value=r.food;$("ePortion").value=r.portion||"";
+ $("eKcal").value=r.kcal;$("eProtein").value=(r.protein_g==null?"":r.protein_g);
+ $("ePills").innerHTML=MEALS.map(m=>"<button data-m='"+m+"' class='"+(m===r.meal_type?"on":"")+"'>"+m+"</button>").join("");
+ $("ePills").querySelectorAll("button").forEach(b=>b.onclick=()=>{
+  $("ePills").querySelectorAll("button").forEach(x=>x.classList.remove("on"));b.classList.add("on");});
+ $("editBack").style.display="flex";requestAnimationFrame(()=>$("editBack").classList.add("open"));
+}
+function closeEdit(){$("editBack").classList.remove("open");setTimeout(()=>$("editBack").style.display="none",280);}
+$("eClose").onclick=closeEdit;$("eCancel").onclick=closeEdit;
+$("eThumb").onclick=()=>$("ePhoto").click();$("eThumbPh").onclick=()=>$("ePhoto").click();
+$("ePhoto").addEventListener("change",async e=>{
+ const f=e.target.files[0];e.target.value="";if(!f)return;
+ try{
+  const img=new Image();img.src=await new Promise((ok,no)=>{const fr=new FileReader();fr.onload=()=>ok(fr.result);fr.onerror=no;fr.readAsDataURL(f);});
+  await new Promise(ok=>img.onload=ok);
+  const cv=document.createElement("canvas"),s=Math.min(1,1024/Math.max(img.width,img.height));
+  cv.width=img.width*s;cv.height=img.height*s;cv.getContext("2d").drawImage(img,0,0,cv.width,cv.height);
+  editB64=cv.toDataURL("image/jpeg",0.8).split(",")[1];
+  $("eThumb").src="data:image/jpeg;base64,"+editB64;$("eThumb").style.display="block";$("eThumbPh").style.display="none";
+ }catch(err){toast("读图失败："+err.message);}
+});
+$("eSave").onclick=async()=>{
+ if(editBusy)return;editBusy=true;$("eSave").disabled=true;$("eSave").textContent="保存中…";
+ const meal=$("ePills").querySelector("button.on").dataset.m;
+ const kcalV=$("eKcal").value;
+ try{
+  await api("/api/correct",{method:"POST",headers:{"Content-Type":"application/json"},
+   body:JSON.stringify({id:editId0,action:"edit",
+    food:$("eFood").value.trim()||undefined,kcal:kcalV===""?undefined:parseFloat(kcalV),
+    portion:$("ePortion").value.trim(),protein_g:$("eProtein").value===""?undefined:parseFloat($("eProtein").value),
+    meal_type:meal,image:editB64||undefined})},60000);
+  closeEdit();bump();refresh();
+ }catch(e){toast("保存失败："+e.message);}
+ $("eSave").disabled=false;$("eSave").textContent="保存修改";editBusy=false;
+};
+function delId(id){delId0=id;$("delBack").style.display="flex";}
+$("dCancel").onclick=()=>$("delBack").style.display="none";
+$("dOk").onclick=async()=>{
+ $("delBack").style.display="none";
  try{await api("/api/correct",{method:"POST",headers:{"Content-Type":"application/json"},
-  body:JSON.stringify({id:id,action:"edit",kcal:parseInt(v)})});toast("已更正");refresh();}catch(e){toast("失败："+e.message);}}
+  body:JSON.stringify({id:delId0,action:"delete"})});toast("已删除");bump();refresh();}
+ catch(e){toast("删除失败："+e.message);}
+};
+function bump(){const el=$("remain");el.classList.remove("bump");void el.offsetWidth;el.classList.add("bump");}
+// 点空白处收起滑开的删除区
+document.addEventListener("click",e=>{
+ if(openId!==null&&!e.target.closest("#list")&&!e.target.closest(".mback")&&!e.target.closest(".modal")){
+  closeOpen(null);}
+});
 refresh();
 </script></body></html>"""
 
@@ -1148,18 +1255,29 @@ class H(BaseHTTPRequestHandler):
                 return self._json(200, {"ok": True, "msg": "已删除"})
             if action == "edit":
                 sets, vals = [], []
+                if j.get("food"):
+                    sets.append("food=?"); vals.append(str(j["food"]).strip())
+                if j.get("portion") is not None:
+                    sets.append("portion=?"); vals.append(str(j["portion"]).strip())
                 if j.get("kcal") is not None:
                     k = int(j["kcal"])
                     sets += ["kcal=?", "kcal_low=?", "kcal_high=?"]
                     vals += [k, int(k * 0.9), int(k * 1.1)]
-                    if not re.search(r"\[表\]|\[估\]", j.get("note") or " "):
-                        pass
-                if j.get("food"):
-                    sets.append("food=?"); vals.append(j["food"])
+                if j.get("protein_g") is not None:
+                    sets.append("protein_g=?"); vals.append(int(j["protein_g"]))
+                if j.get("meal_type") in ("早餐", "午餐", "晚餐", "加餐"):
+                    sets.append("meal_type=?"); vals.append(j["meal_type"])
                 if not sets:
                     return self._json(400, {"error": "没有要改的字段"})
                 vals.append(rid)
                 conn.execute("UPDATE meals SET " + ",".join(sets) + " WHERE id=?", vals)
+                img = j.get("image")  # 编辑页可顺手换照片
+                if img:
+                    try:
+                        with open(os.path.join(DATA, "meals", "record_%d.jpg" % rid), "wb") as f:
+                            f.write(base64.b64decode(img))
+                    except Exception:
+                        pass
                 return self._json(200, {"ok": True, "msg": "已更正"})
         return self._json(400, {"error": "action 必须是 delete/edit"})
 
