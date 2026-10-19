@@ -480,24 +480,41 @@ INDEX = r"""<!doctype html><html lang="zh"><head>
  body.theme-glass #avFix{background:rgba(255,255,255,.5);border-color:#57b8f2;color:#1d6fa5}
  body.theme-glass #avSave{background:linear-gradient(135deg,#3ea0ff,#6fc3ff)}
  body.theme-glass #fixText{background:rgba(255,255,255,.5);border-color:rgba(255,255,255,.75);color:#203442}
+ body.theme-glass .gcard{background:rgba(255,255,255,.52);border:1px solid rgba(255,255,255,.65);
+  box-shadow:0 8px 32px rgba(84,140,190,.14);backdrop-filter:blur(18px) saturate(1.5);-webkit-backdrop-filter:blur(18px) saturate(1.5)}
+ body.theme-glass .mrow{border-bottom:0;box-shadow:0 1px 6px rgba(84,140,190,.10)}
+ body.theme-glass .mmain{background:rgba(255,255,255,.78)}
+ body.theme-glass .gh-name{color:#1d3d54}
+ body.theme-glass .gh-tot b{color:#1d3d54}
+ body.theme-glass .gh-tot small{color:#7d95ad}
+ body.theme-glass .gsug{color:#7d95ad}
+ body.theme-glass .chev{color:#3ea0ff}
+ body.theme-glass .msub{color:#7d95ad}
  .num{font-size:34px;font-weight:800;letter-spacing:-.5px;margin:2px 0 10px}
  .num small{font-size:14px;color:#8a9299;font-weight:500;margin-left:3px}
  .dinnerline{display:none;margin-top:9px;padding-top:8px;border-top:1px dashed #e6eaed;font-size:12.5px;color:#8a9299}
  .dinnerline.show{display:block}
- .ghead{display:flex;align-items:center;gap:6px;padding:10px 2px 6px}
- .gsug{font-size:11.5px;color:#8a9299;flex:1}
- .gtot{font-size:12.5px;color:#191c1f;font-weight:600;white-space:nowrap}
- .mrow{position:relative;overflow:hidden;border-bottom:1px solid #f0f2f4}
- .dz{position:absolute;top:0;bottom:0;width:72px;display:flex;align-items:center;justify-content:center}
- .dz.l{left:0}.dz.r{right:0}
- .delzone2{width:100%;height:100%;border:0;background:#f87171;color:#fff;font-size:13px;font-weight:600}
- .mmain{position:relative;display:flex;align-items:center;gap:9px;padding:8px 2px;background:#fff;transition:transform .18s;touch-action:pan-y;user-select:none}
- .thumb{width:44px;height:44px;border-radius:10px;object-fit:cover;flex:none;background:#f0f2f4}
+ .gcard{background:#fff;border-radius:18px;padding:14px;box-shadow:0 2px 12px rgba(16,24,40,.06);margin-bottom:12px}
+ .ghead{display:flex;align-items:center;gap:8px;padding:0 2px 2px}
+ .gh-emoji{font-size:18px}
+ .gh-name{font-size:16px;font-weight:700}
+ .gh-tot{margin-left:auto;text-align:right}
+ .gh-tot small{display:block;color:#8a9299;font-size:11px;font-weight:400}
+ .gh-tot b{font-size:15px}
+ .gsug{font-size:12px;color:#8a9299;margin:0 2px 10px}
+ .mrow{position:relative;overflow:hidden;border-radius:14px;margin-bottom:9px;box-shadow:0 1px 4px rgba(16,24,40,.05)}
+ .mrow:last-child{margin-bottom:0}
+ .dz{position:absolute;top:4px;bottom:4px;width:70px;display:flex;align-items:center;justify-content:center}
+ .dz.l{left:4px}.dz.r{right:4px}
+ .delzone2{width:100%;height:42px;border:0;background:#f8a8a8;color:#fff;font-size:13px;font-weight:600;border-radius:999px}
+ .mmain{position:relative;display:flex;align-items:center;gap:10px;padding:8px;background:#fff;border-radius:14px;transition:transform .18s;touch-action:pan-y;user-select:none}
+ .thumb{width:48px;height:48px;border-radius:12px;object-fit:cover;flex:none;background:#f0f2f4}
  .thumb.ph{display:flex;align-items:center;justify-content:center;font-size:20px}
- .mname{flex:1;font-size:13.5px;min-width:0;word-break:break-all}
+ .mname{flex:1;font-size:14.5px;font-weight:600;min-width:0;word-break:break-all}
+ .msub{font-size:11.5px;color:#8a9299;margin-top:2px;font-weight:400}
  .kcell{color:#8a9299;white-space:nowrap;font-size:13px;cursor:pointer}
  .kcell b{color:#191c1f;font-weight:600}
- .chev{color:#c3cad1;margin-left:3px;font-weight:700}
+ .chev{color:#c3cad1;margin-left:4px;font-weight:700}
  .bar{height:9px;background:#edf0f2;border-radius:99px;overflow:hidden}
  .bar i{display:block;height:100%;width:0;border-radius:99px;background:linear-gradient(90deg,#22c55e,#16a34a);transition:width .5s}
  .bar.warn i{background:linear-gradient(90deg,#f59e0b,#ef4444)}
@@ -669,19 +686,23 @@ async function refresh(){
    if(!cur||cur.m!==r.meal_type){cur={m:r.meal_type,items:[],tot:0};groups.push(cur);}
    cur.items.push(r);cur.tot+=r.kcal||0;
   }
+  const GEMO={"早餐":"☀️","午餐":"🌤️","晚餐":"🌙","加餐":"🍪"};
   let h="";
   for(const g of groups){
-   h+="<div class='ghead'><span class='chip'>"+esc(g.m)+"</span><span class='gsug'>建议 "+sug(g.m)+" 千卡</span>"+
-    "<span class='gtot'>"+g.tot+" 千卡</span></div>";
+   h+="<div class='gcard'><div class='ghead'>"+
+    "<span class='gh-emoji'>"+(GEMO[g.m]||"🍽️")+"</span><span class='gh-name'>"+esc(g.m)+"</span>"+
+    "<div class='gh-tot'><small>本餐合计</small><b>"+g.tot+" 千卡</b></div></div>"+
+    "<div class='gsug'>热量建议："+sug(g.m)+" kcal</div>";
    for(const r of g.items){
     h+="<div class='mrow' data-id='"+r.id+"'>"+
      "<div class='dz l'><button class='delzone2' data-del='"+r.id+"'>删除</button></div>"+
      "<div class='dz r'><button class='delzone2' data-del='"+r.id+"'>删除</button></div>"+
      "<div class='mmain'>"+
      (r.photo?"<img class='thumb' src='/photo/"+r.id+"' alt=''>":"<div class='thumb ph'>🍳</div>")+
-     "<div class='mname'>"+esc(r.food)+"</div>"+
-     "<div class='kcell'><b>"+r.kcal+"</b> 千卡 "+esc(r.note||"")+"<span class='chev'>›</span></div></div></div>";
+     "<div class='mname'>"+esc(r.food)+(r.note?"<div class='msub'>"+esc(r.note)+"</div>":"")+"</div>"+
+     "<div class='kcell'><b>"+r.kcal+"</b> 千卡<span class='chev'>›</span></div></div></div>";
    }
+   h+="</div>";
   }
   $("list").innerHTML=h||"<div class='muted' style='padding:8px 0'>还没有记录，开吃吧 🍚</div>";
   bindSwipe($("list"));
