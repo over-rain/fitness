@@ -450,9 +450,9 @@ INDEX = r"""<!doctype html><html lang="zh"><head>
  .num.bump{animation:bump .5s}
  /* ===== 玻璃冰块主题（互联网清新）=====
     body.theme-glass 时整体覆盖为淡蓝渐变底 + 磨砂半透明卡片 + 冰蓝主色 */
- body.theme-glass{background:linear-gradient(165deg,#d8ecfb 0%,#e9f4fb 45%,#e3f2f5 100%);color:#203442}
- body.theme-glass .card,body.theme-glass .modal{background:rgba(255,255,255,.52);border:1px solid rgba(255,255,255,.65);
-  box-shadow:0 8px 32px rgba(84,140,190,.14);backdrop-filter:blur(18px) saturate(1.5);-webkit-backdrop-filter:blur(18px) saturate(1.5)}
+ body.theme-glass{background:linear-gradient(165deg,#cfe6fb 0%,#e6f3fc 45%,#dceff5 100%);color:#203442}
+ body.theme-glass .card,body.theme-glass .modal{background:rgba(255,255,255,.40);border:1px solid rgba(255,255,255,.70);
+  box-shadow:0 8px 32px rgba(84,140,190,.16);backdrop-filter:blur(24px) saturate(1.6);-webkit-backdrop-filter:blur(24px) saturate(1.6)}
  body.theme-glass .hd h1{color:#1d3d54}
  body.theme-glass .muted{color:#7d95ad}
  body.theme-glass .num{color:#1d3d54}
@@ -488,13 +488,13 @@ INDEX = r"""<!doctype html><html lang="zh"><head>
  body.theme-glass .mback{background:rgba(120,160,190,.35);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
  body.theme-glass .fixcnt{color:#7d95ad}
  body.theme-glass .fixerr{background:rgba(255,235,235,.6)}
- body.theme-glass #av{background:linear-gradient(165deg,#d8ecfb 0%,#e9f4fb 45%,#e3f2f5 100%);border-color:rgba(255,255,255,.4)}
+ body.theme-glass #av{background:linear-gradient(165deg,#cfe6fb 0%,#e6f3fc 45%,#dceff5 100%);border-color:rgba(255,255,255,.4)}
  body.theme-glass .avbar{background:transparent}
  body.theme-glass #avBack,body.theme-glass #avMeal{background:rgba(255,255,255,.5)}
  body.theme-glass #avmenu{background:rgba(255,255,255,.75);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px)}
  body.theme-glass #avmenu button.on{background:rgba(190,228,255,.6);color:#1d6fa5}
- body.theme-glass .avcard{background:rgba(255,255,255,.52);border:1px solid rgba(255,255,255,.65);
-  backdrop-filter:blur(18px) saturate(1.5);-webkit-backdrop-filter:blur(18px) saturate(1.5)}
+ body.theme-glass .avcard{background:rgba(255,255,255,.40);border:1px solid rgba(255,255,255,.70);
+  backdrop-filter:blur(24px) saturate(1.6);-webkit-backdrop-filter:blur(24px) saturate(1.6)}
  body.theme-glass .avbig{color:#1d6fa5}
  body.theme-glass .avitem{border-bottom:1px solid rgba(255,255,255,.55)}
  body.theme-glass .avmacros div{border-right:1px solid rgba(255,255,255,.6)}
@@ -503,17 +503,17 @@ INDEX = r"""<!doctype html><html lang="zh"><head>
  body.theme-glass #avFix{background:rgba(255,255,255,.5);border-color:#57b8f2;color:#1d6fa5}
  body.theme-glass #avSave{background:linear-gradient(135deg,#3ea0ff,#6fc3ff)}
  body.theme-glass #fixText{background:rgba(255,255,255,.5);border-color:rgba(255,255,255,.75);color:#203442}
- body.theme-glass .gcard{background:rgba(255,255,255,.52);border:1px solid rgba(255,255,255,.65);
-  box-shadow:0 8px 32px rgba(84,140,190,.14);backdrop-filter:blur(18px) saturate(1.5);-webkit-backdrop-filter:blur(18px) saturate(1.5)}
+ body.theme-glass .gcard{background:rgba(255,255,255,.40);border:1px solid rgba(255,255,255,.70);
+  box-shadow:0 8px 32px rgba(84,140,190,.16);backdrop-filter:blur(24px) saturate(1.6);-webkit-backdrop-filter:blur(24px) saturate(1.6)}
  body.theme-glass .mrow{border-bottom:0;box-shadow:0 1px 6px rgba(84,140,190,.10)}
- body.theme-glass .mmain{background:rgba(255,255,255,.78)}
+ body.theme-glass .mmain{background:rgba(255,255,255,.62);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)}
  body.theme-glass .gh-name{color:#1d3d54}
  body.theme-glass .gh-tot b{color:#1d3d54}
  body.theme-glass .gh-tot small{color:#7d95ad}
  body.theme-glass .gsug{color:#7d95ad}
  body.theme-glass .chev{color:#3ea0ff}
  body.theme-glass .msub{color:#7d95ad}
- body.theme-glass .sheet{background:rgba(246,250,253,.82);backdrop-filter:blur(20px) saturate(1.5);-webkit-backdrop-filter:blur(20px) saturate(1.5);border:1px solid rgba(255,255,255,.65)}
+ body.theme-glass .sheet{background:rgba(246,250,253,.68);backdrop-filter:blur(24px) saturate(1.6);-webkit-backdrop-filter:blur(24px) saturate(1.6);border:1px solid rgba(255,255,255,.70)}
  body.theme-glass .einput{background:rgba(255,255,255,.6);border-color:rgba(255,255,255,.8)}
  body.theme-glass .pills button{background:rgba(255,255,255,.5);border-color:rgba(255,255,255,.8);color:#4a6b80}
  body.theme-glass .pills button.on{background:#eaf6ff;border-color:#57b8f2;color:#1d6fa5}
@@ -534,7 +534,9 @@ INDEX = r"""<!doctype html><html lang="zh"><head>
  .gsug{font-size:12px;color:#8a9299;margin:0 2px 10px}
  .mrow{position:relative;overflow:hidden;border-radius:14px;margin-bottom:9px;box-shadow:0 1px 4px rgba(16,24,40,.05)}
  .mrow:last-child{margin-bottom:0}
- .dz{position:absolute;top:4px;bottom:4px;right:4px;width:70px;display:flex;align-items:center;justify-content:center}
+ .dz{position:absolute;top:4px;bottom:4px;right:4px;width:70px;display:flex;align-items:center;justify-content:center;
+  opacity:0;pointer-events:none;transition:opacity .18s}
+ .mrow.open .dz{opacity:1;pointer-events:auto}
  .delzone2{width:100%;height:42px;border:0;background:#f8a8a8;color:#fff;font-size:13px;font-weight:600;border-radius:999px}
  .mmain{position:relative;display:flex;align-items:center;gap:10px;padding:8px;background:#fff;border-radius:14px;transition:transform .18s;touch-action:pan-y;user-select:none}
  .thumb{width:48px;height:48px;border-radius:12px;object-fit:cover;flex:none;background:#f0f2f4}
@@ -584,7 +586,7 @@ INDEX = r"""<!doctype html><html lang="zh"><head>
   <button class="send" id="bSend">发送</button></div>
  <input type="file" id="photo" accept="image/*" capture="environment" style="display:none">
  <div id="reply"></div></div>
-<div class="card"><div class="muted" style="margin-bottom:4px">今日明细 · 右侧点改 · 左右滑删</div><div id="list"></div></div>
+<div class="card"><div class="muted" style="margin-bottom:4px">今日明细 · 右侧点改 · 左滑删除</div><div id="list"></div></div>
 <div id="av">
  <div class="avbar">
   <button id="avBack">‹</button>
@@ -765,7 +767,7 @@ async function refresh(){
 }
 let openId=null,suppressClick=false,_recs={};
 function closeOpen(exceptId){document.querySelectorAll("#list .mrow").forEach(row=>{
- if(+row.dataset.id!==exceptId)row.querySelector(".mmain").style.transform="";});
+ if(+row.dataset.id!==exceptId){row.querySelector(".mmain").style.transform="";row.classList.remove("open");}});
  if(exceptId==null)openId=null;}
 function bindSwipe(list){
  list.querySelectorAll(".mrow").forEach(row=>{
@@ -784,13 +786,13 @@ function bindSwipe(list){
    if(cap){try{main.releasePointerCapture(e.pointerId);}catch(_){}}
    if(!moved){if(openId===rid){main.style.transform="";openId=null;}return;}
    const t=(openId===rid?-72:0)+(e.clientX-sx);
-   if(t<-36){closeOpen(rid);main.style.transform="translateX(-72px)";openId=rid;}
-   else{main.style.transform="";if(openId===rid)openId=null;}};
+   if(t<-36){closeOpen(rid);main.style.transform="translateX(-72px)";row.classList.add("open");openId=rid;}
+   else{main.style.transform="";row.classList.remove("open");if(openId===rid)openId=null;}};
   main.addEventListener("pointerup",end);
   main.addEventListener("pointercancel",()=>{drag=false;main.style.transition="";
-   main.style.transform=openId===rid?"translateX(-72px)":"";});
+   main.style.transform=openId===rid?"translateX(-72px)":"";row.classList.toggle("open",openId===rid);});
   main.addEventListener("click",e=>{if(suppressClick||drag||moved)return;
-   if(e.target.closest(".kcell"))editId(rid,_recs[rid].kcal);});
+   if(e.target.closest(".kcell"))openEdit(rid);});
   row.querySelectorAll(".delzone2").forEach(b=>b.addEventListener("click",()=>delId(rid)));
  });
 }
