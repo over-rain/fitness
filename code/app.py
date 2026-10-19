@@ -321,9 +321,11 @@ def today_summary(user_id):
             r["photo"] = 1 if os.path.exists(os.path.join(DATA, "meals", "record_%d.jpg" % r["id"])) else 0
     eaten = sum(r["kcal"] or 0 for r in rows)
     protein = sum(r["protein_g"] or 0 for r in rows)
+    fat = sum(r["fat_g"] or 0 for r in rows)
+    carb = sum(r["carb_g"] or 0 for r in rows)
     remaining = tgt["kcal"] - eaten
     return {"user": user_id, "name": tgt["name"], "date": date, "records": rows,
-            "eaten": eaten, "protein": protein,
+            "eaten": eaten, "protein": protein, "fat": fat, "carb": carb,
             "target": tgt["kcal"], "protein_target": tgt["protein"],
             "remaining": remaining, "dinner_tip": dinner_tip(rows, remaining)}
 
@@ -415,10 +417,12 @@ INDEX = r"""<!doctype html><html lang="zh"><head>
  .avmacros i{font-style:normal;display:block;font-size:18px;font-weight:700}
  .avmacros span{font-size:11.5px;color:#8a9299}
  .mcards{display:flex;gap:9px;margin-top:10px}
- .mcd{flex:1;background:rgba(255,255,255,.72);border-radius:16px;padding:10px 6px;text-align:center;border:1px solid rgba(223,233,245,.8)}
- .mc-l{font-size:13px;font-weight:600;margin-bottom:4px}
- .mc-e{font-size:11px;color:#8a9299;margin-top:6px;padding-top:6px;border-top:1px dashed #e3e9ee}
- .mc-n{font-size:11px;color:#8a9299;margin-top:3px}
+ .mcd{flex:1;background:rgba(255,255,255,.72);border-radius:16px;padding:10px;text-align:center;border:1px solid rgba(223,233,245,.8)}
+ .mcrow{display:flex;align-items:center;gap:8px}
+ .mcol{flex:1;text-align:left;min-width:0}
+ .mc-l{font-size:13.5px;font-weight:600;color:#1d3d54}
+ .mc-v{font-size:16px;font-weight:700;color:#1d3d54;margin-top:2px}
+ .mc-n{font-size:11px;color:#8a9299;margin-top:8px;padding-top:7px;border-top:1px dashed #e3e9ee}
  .mc-n b{color:#191c1f;font-size:12px}
  .avbtns{position:fixed;bottom:0;left:0;right:0;margin:0 auto;max-width:430px;display:flex;gap:9px;padding:10px 12px calc(10px + env(safe-area-inset-bottom));background:#fff;box-shadow:0 -2px 10px rgba(0,0,0,.06);z-index:45}
  #avFix:disabled,#avSave:disabled{opacity:.55}
@@ -845,7 +849,7 @@ $("bSend").onclick=sendText;
 $("bPhoto").onclick=()=>$("photo").click();
 // ---- 分析结果页（照片专用：识别→修正→确认保存）----
 const MEALS=["早餐","午餐","晚餐","加餐"];
-let avItems=[],avB64=null,avMeal="早餐",avBusy=false,avTarget={protein:0,fat:0,carb:0};
+let avItems=[],avB64=null,avMeal="早餐",avBusy=false,avTarget={protein:0,fat:0,carb:0},avDay={protein:0,fat:0,carb:0};
 $("avmenu").innerHTML=MEALS.map(m=>"<button data-m='"+m+"'>"+m+"</button>").join("");
 function hourMeal(h){return h<10?"早餐":h<14?"午餐":h<17?"加餐":h<21?"晚餐":"加餐";}
 function exifHour(buf){
@@ -904,23 +908,22 @@ function renderAv(){
  if(avItems.length){
   $("avTot").style.display="block";
   $("avTot").innerHTML="<div class='avbig'>"+tot("kcal")+" <small>千卡</small></div>"+
-   "<div class='mcards'>"+mcard("蛋白质",tot("protein_g"),avTarget.protein,"#2f8bff")+
-   mcard("脂肪",tot("fat_g"),avTarget.fat,"#8fc9ff")+
-   mcard("碳水",tot("carb_g"),avTarget.carb,"#1b4b9e")+"</div>";
+   "<div class='mcards'>"+mcard("蛋白质",tot("protein_g"),avDay.protein,avTarget.protein,"#2f8bff")+
+   mcard("脂肪",tot("fat_g"),avDay.fat,avTarget.fat,"#8fc9ff")+
+   mcard("碳水",tot("carb_g"),avDay.carb,avTarget.carb,"#1b4b9e")+"</div>";
  }else{$("avTot").innerHTML="";$("avTot").style.display="none";}
 }
-function mcard(label,val,target,color){
- const pct=target>0?Math.min(100,Math.round(val/target*100)):0;
- const R=32,C=2*Math.PI*R,off=C*(1-pct/100);
- return "<div class='mcd'><div class='mc-l' style='color:"+color+"'>"+label+"</div>"+
-  "<svg width='84' height='84' viewBox='0 0 84 84'>"+
-  "<circle cx='42' cy='42' r='"+R+"' fill='none' stroke='#dfe9f5' stroke-width='9'/>"+
-  "<circle cx='42' cy='42' r='"+R+"' fill='none' stroke='"+color+"' stroke-width='9' stroke-linecap='round' "+
-  "stroke-dasharray='"+C+"' stroke-dashoffset='"+off+"' transform='rotate(-90 42 42)'/>"+
-  "<text x='42' y='38' text-anchor='middle' font-size='12' fill='#52708a'>"+label+"</text>"+
-  "<text x='42' y='58' text-anchor='middle' font-size='17' font-weight='700' fill='#1d3d54'>"+pct+"%</text></svg>"+
-  "<div class='mc-e'>已吃</div>"+
-  "<div class='mc-n'>已吃 <b>"+val+"g</b> / 目标 <b>"+(target||0)+"g</b></div></div>";
+function mcard(label,mealVal,dayVal,target,color){
+ const pct=target>0?Math.min(100,Math.round(dayVal/target*100)):0;
+ const R=26,C=2*Math.PI*R,off=C*(1-pct/100);
+ return "<div class='mcd'><div class='mcrow'>"+
+  "<svg width='64' height='64' viewBox='0 0 64 64'>"+
+  "<circle cx='32' cy='32' r='"+R+"' fill='none' stroke='#dfe9f5' stroke-width='7'/>"+
+  "<circle cx='32' cy='32' r='"+R+"' fill='none' stroke='"+color+"' stroke-width='7' stroke-linecap='round' "+
+  "stroke-dasharray='"+C+"' stroke-dashoffset='"+off+"' transform='rotate(-90 32 32)'/>"+
+  "<text x='32' y='37' text-anchor='middle' font-size='13.5' font-weight='700' fill='#1d3d54'>"+pct+"%</text></svg>"+
+  "<div class='mcol'><div class='mc-l'>"+label+"</div><div class='mc-v'>"+mealVal+"g</div></div></div>"+
+  "<div class='mc-n'>已吃 <b>"+dayVal+"g</b> / 目标 <b>"+(target||0)+"g</b></div></div>";
 }
 function closeAv(){$("av").style.display="none";avBusy=false;}
 $("avBack").onclick=closeAv;
@@ -976,7 +979,7 @@ $("fixOk").onclick=async()=>{
   const j=await api("/api/analyze",{method:"POST",headers:{"Content-Type":"application/json"},
    body:JSON.stringify({user:user,image:fixB64||avB64,text:t,prev:avItems})},200000);
   clearInterval(fi);
-  avItems=j.items||[];if(j.targets)avTarget=j.targets;renderAv();hideBack("fixBack");
+  avItems=j.items||[];if(j.targets)avTarget=j.targets;if(j.day)avDay=j.day;renderAv();hideBack("fixBack");
  }catch(e){
   clearInterval(fi);
   fe.textContent="修正失败："+e.message+"（已识别结果未丢失，可重试或返回）";
@@ -1003,7 +1006,7 @@ $("photo").addEventListener("change",async e=>{
   avWait("识别中");
   const j=await api("/api/analyze",{method:"POST",headers:{"Content-Type":"application/json"},
    body:JSON.stringify({user:user,image:avB64})},200000);
-  avItems=j.items||[];if(j.targets)avTarget=j.targets;renderAv();
+  avItems=j.items||[];if(j.targets)avTarget=j.targets;if(j.day)avDay=j.day;renderAv();
   if(!avItems.length)$("avItems").innerHTML="<div class='avload'>🤔 没识别出食物：点「AI 修正」描述一下，或返回重拍</div>";
  }catch(err){avDone();toast("识别失败："+err.message);closeAv();}
  avBusyUI(false);avBusy=false;
@@ -1195,8 +1198,10 @@ class H(BaseHTTPRequestHandler):
         res = llm_analyze(None, image, None, extra)
         items = [resolve_item(i, user) for i in (res.get("items") or [])]
         tg = profile_targets(user)
+        s = today_summary(user)
         self._json(200, {"items": items,
-                         "targets": {"protein": tg["protein"], "fat": tg["fat"], "carb": tg["carb"]}})
+                         "targets": {"protein": tg["protein"], "fat": tg["fat"], "carb": tg["carb"]},
+                         "day": {"protein": s["protein"], "fat": s["fat"], "carb": s["carb"]}})
 
     def _handle_save(self, j):
         """分析结果页确认保存：餐次用页面所选，items 用已识别结果"""
