@@ -403,27 +403,35 @@ INDEX = r"""<!doctype html><html lang="zh"><head>
  #avmenu button{display:block;width:100%;border:0;background:none;padding:11px 30px;font-size:14.5px}
  #avmenu button.on{background:#f0fdf4;color:#16a34a;font-weight:700}
  #avImg{width:100%;max-height:300px;object-fit:cover;display:block;background:#dde2e6}
- .avwrap{padding:12px}
- .avcard{background:#fff;border-radius:18px;padding:14px;box-shadow:0 2px 12px rgba(16,24,40,.06);margin-bottom:12px}
- .avitem{padding:9px 0;border-bottom:1px solid #f0f2f4;display:flex;justify-content:space-between;gap:8px;align-items:baseline}
+ .avwrap{padding:12px;display:flex;flex-direction:column;gap:16px}
+ .avc{background:rgba(255,255,255,.72);border-radius:24px;border:1px solid rgba(255,255,255,.85);
+  box-shadow:0 4px 16px rgba(150,180,220,.15),0 1px 4px rgba(150,180,220,.08);
+  backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px)}
+ .avimgc{padding:8px}
+ #avImg{width:100%;border-radius:16px;display:block;max-height:320px;object-fit:cover}
+ .kchead{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:4px}
+ .kctitle{font-size:14px;font-weight:700;color:#1A3050}
+ .kctag{background:#3B88ED;color:#fff;border-radius:10px;padding:5px 12px;font-size:12.5px}
+ .avmrow3{display:flex;gap:16px}
+ .avitem{padding:10px 2px;border-bottom:1px solid rgba(180,205,235,.3);display:flex;justify-content:space-between;gap:8px;align-items:baseline}
  .avitem:last-child{border-bottom:0}
  .avname b{font-size:14.5px}
- .avk{color:#5c6670;white-space:nowrap;font-size:13px}
- .avbig{font-size:32px;font-weight:800;color:#16a34a;letter-spacing:-.5px}
- .avbig small{font-size:13px;color:#8a9299;font-weight:500;margin-left:2px}
+ .avk{color:#3B88ED;white-space:nowrap;font-size:13.5px;font-weight:600}
+ .avbig{font-size:34px;font-weight:600;color:#163A78}
+ .avbig small{font-size:13px;color:#546278;font-weight:500;margin-left:2px}
  .avmacros{display:flex;margin-top:10px}
  .avmacros div{flex:1;text-align:center;border-right:1px solid #f0f2f4}
  .avmacros div:last-child{border-right:0}
  .avmacros i{font-style:normal;display:block;font-size:18px;font-weight:700}
  .avmacros span{font-size:11.5px;color:#8a9299}
  .mcards{display:flex;gap:9px;margin-top:10px}
- .mcd{flex:1;background:rgba(255,255,255,.72);border-radius:16px;padding:10px;text-align:center;border:1px solid rgba(223,233,245,.8)}
- .mcrow{display:flex;align-items:center;gap:8px}
+ .mcd{flex:1;min-width:0;padding:12px 10px}
+ .mcrow{display:flex;align-items:center;gap:10px}
  .mcol{flex:1;text-align:left;min-width:0}
- .mc-l{font-size:13.5px;font-weight:600;color:#1d3d54}
- .mc-v{font-size:16px;font-weight:700;color:#1d3d54;margin-top:2px}
- .mc-n{font-size:11px;color:#8a9299;margin-top:8px;padding-top:7px;border-top:1px dashed #e3e9ee}
- .mc-n b{color:#191c1f;font-size:12px}
+ .mc-l{font-size:13.5px;font-weight:600;color:#1A3050}
+ .mc-v{font-size:16px;font-weight:600;color:#163A78;margin-top:2px}
+ .mc-n{font-size:11.5px;color:#546278;margin-top:10px;padding-top:8px;border-top:1px solid rgba(180,205,235,.3)}
+ .mc-n b{color:#163A78;font-size:12.5px}
  .avbtns{position:fixed;bottom:0;left:0;right:0;margin:0 auto;max-width:430px;display:flex;gap:9px;padding:10px 12px calc(10px + env(safe-area-inset-bottom));background:#fff;box-shadow:0 -2px 10px rgba(0,0,0,.06);z-index:45}
  #avFix:disabled,#avSave:disabled{opacity:.55}
  .fixerr{display:none;margin-top:8px;padding:8px 10px;background:#fef2f2;border-left:3px solid #ef4444;color:#991b1b;font-size:12.5px;border-radius:6px;word-break:break-all}
@@ -623,10 +631,11 @@ INDEX = r"""<!doctype html><html lang="zh"><head>
   <div style="width:34px"></div>
  </div>
  <div id="avmenu"></div>
- <img id="avImg" alt="餐食照片">
  <div class="avwrap">
-  <div class="avcard" id="avTot"></div>
-  <div class="avcard" id="avItems"></div>
+  <div class="avc avimgc"><img id="avImg" alt="餐食照片"></div>
+  <div class="avc" id="avKcal"></div>
+  <div class="avmrow3" id="avM"></div>
+  <div class="avc" id="avItems"></div>
  </div>
  <div class="avbtns"><button id="avFix">✏️ AI 修正</button><button id="avSave">💾 保存记录</button></div>
 </div>
@@ -660,7 +669,9 @@ INDEX = r"""<!doctype html><html lang="zh"><head>
    <div class="muted" id="s_hint" style="margin-top:9px"></div>
   </div>
   <div class="panel" id="pGeneral">
-   <div class="muted" style="padding:26px 0;text-align:center">暂无可配置项，敬请期待</div>
+   <label style="display:flex;align-items:flex-start;gap:9px;cursor:pointer;padding:4px 2px">
+    <input type="checkbox" id="mockChk" style="width:17px;height:17px;margin-top:2px">
+    <span style="font-size:13.5px">测试模式<br><span class="muted" style="font-size:11.5px">识别立即返回示例数据，不请求大模型（用于测试界面与入库流程）</span></span></label>
   </div>
  </div></div>
 <div class="mback up" id="editBack" style="display:none">
@@ -703,7 +714,13 @@ function clearReply(){const el=$("reply");el.className="";el.textContent="";}
 function showBack(id){const el=$(id);el.style.display="flex";el.classList.remove("closing");}
 function hideBack(id){const el=$(id);el.classList.add("closing");
  setTimeout(()=>{el.style.display="none";el.classList.remove("closing");},240);}
-function openSettings(){showBack("mback");loadProfile();}
+function openSettings(){showBack("mback");loadProfile();
+ api("/api/mockcfg").then(j=>{$("mockChk").checked=!!j.mock;}).catch(()=>{});}
+$("mockChk").onchange=async e=>{const on=e.target.checked;
+ try{const j=await api("/api/mockcfg",{method:"POST",headers:{"Content-Type":"application/json"},
+  body:JSON.stringify({mock:on})},15000);
+  toast(j.mock?"测试模式开：识别返回示例数据":"测试模式关：恢复真实识别");}
+ catch(err){toast("切换失败："+err.message);e.target.checked=!on;}};
 function closeSettings(){hideBack("mback");}
 $("gear").onclick=openSettings;
 function applyTheme(t){document.body.classList.toggle("theme-glass",t==="glass");
@@ -897,31 +914,33 @@ function avDone(){if(avInt)clearInterval(avInt);avInt=null;}
 function avBusyUI(on){$("avFix").disabled=on;$("avSave").disabled=on;}
 function renderAv(){
  avDone();
- $("avTot").style.display=avItems.length?"block":"none";
  $("avMeal").textContent="今天 "+avMeal+" ▼";
  $("avmenu").querySelectorAll("button").forEach(b=>b.classList.toggle("on",b.dataset.m===avMeal));
  const tot=k=>avItems.reduce((s,i)=>s+(i[k]||0),0);
+ const has=avItems.length>0;
+ $("avKcal").style.display=has?"block":"none";
+ $("avM").style.display=has?"flex":"none";
+ if(has){
+  $("avKcal").innerHTML="<div class='kchead'><div class='kctitle'>这餐热量</div><div class='kctag'>今天 "+avMeal+"</div></div>"+
+   "<div class='avbig'>"+tot("kcal")+" <small>千卡</small></div>";
+  $("avM").innerHTML=mcard("蛋白质",tot("protein_g"),avDay.protein,avTarget.protein,"#2f8bff")+
+   mcard("脂肪",tot("fat_g"),avDay.fat,avTarget.fat,"#8fc9ff")+
+   mcard("碳水",tot("carb_g"),avDay.carb,avTarget.carb,"#1b4b9e");
+ }
  let h="";
  for(const it of avItems)h+="<div class='avitem'><div class='avname'><b>"+esc(it.food)+"</b> <span class='muted'>"+
   esc(it.portion||"")+"</span> "+esc(it.note||"")+"</div><div class='avk'>"+it.kcal+" 千卡</div></div>";
  $("avItems").innerHTML=h||"<div class='avload'><span class='spin'></span> 识别中…</div>";
- if(avItems.length){
-  $("avTot").style.display="block";
-  $("avTot").innerHTML="<div class='avbig'>"+tot("kcal")+" <small>千卡</small></div>"+
-   "<div class='mcards'>"+mcard("蛋白质",tot("protein_g"),avDay.protein,avTarget.protein,"#2f8bff")+
-   mcard("脂肪",tot("fat_g"),avDay.fat,avTarget.fat,"#8fc9ff")+
-   mcard("碳水",tot("carb_g"),avDay.carb,avTarget.carb,"#1b4b9e")+"</div>";
- }else{$("avTot").innerHTML="";$("avTot").style.display="none";}
 }
 function mcard(label,mealVal,dayVal,target,color){
  const pct=target>0?Math.min(100,Math.round(dayVal/target*100)):0;
  const R=26,C=2*Math.PI*R,off=C*(1-pct/100);
- return "<div class='mcd'><div class='mcrow'>"+
+ return "<div class='avc mcd'><div class='mcrow'>"+
   "<svg width='64' height='64' viewBox='0 0 64 64'>"+
-  "<circle cx='32' cy='32' r='"+R+"' fill='none' stroke='#dfe9f5' stroke-width='7'/>"+
+  "<circle cx='32' cy='32' r='"+R+"' fill='none' stroke='rgba(180,205,235,.35)' stroke-width='7'/>"+
   "<circle cx='32' cy='32' r='"+R+"' fill='none' stroke='"+color+"' stroke-width='7' stroke-linecap='round' "+
   "stroke-dasharray='"+C+"' stroke-dashoffset='"+off+"' transform='rotate(-90 32 32)'/>"+
-  "<text x='32' y='37' text-anchor='middle' font-size='13.5' font-weight='700' fill='#1d3d54'>"+pct+"%</text></svg>"+
+  "<text x='32' y='37' text-anchor='middle' font-size='13.5' font-weight='700' fill='#163A78'>"+pct+"%</text></svg>"+
   "<div class='mcol'><div class='mc-l'>"+label+"</div><div class='mc-v'>"+mealVal+"g</div></div></div>"+
   "<div class='mc-n'>已吃 <b>"+dayVal+"g</b> / 目标 <b>"+(target||0)+"g</b></div></div>";
 }
@@ -1101,6 +1120,8 @@ class H(BaseHTTPRequestHandler):
             self._send(200, "text/html; charset=utf-8", INDEX.encode("utf-8"))
         elif p == "/api/health":
             self._json(200, {"ok": True, "mock": CFG.get("mock", False)})
+        elif p == "/api/mockcfg":
+            self._json(200, {"mock": bool(CFG.get("mock", False))})
         elif p.startswith("/photo/"):
             if not self._authed():
                 return self._send(404, "image/jpeg", b"")
@@ -1135,7 +1156,7 @@ class H(BaseHTTPRequestHandler):
 
     def do_POST(self):
         p = urlparse(self.path).path
-        if p not in ("/api/meal", "/api/correct", "/api/profile", "/api/analyze", "/api/save", "/api/clear"):
+        if p not in ("/api/meal", "/api/correct", "/api/profile", "/api/analyze", "/api/save", "/api/clear", "/api/mockcfg"):
             return self._send(404, "text/plain", b"not found")
         if not self._authed():
             return self._json(401, {"error": "需要访问码"})
@@ -1154,6 +1175,12 @@ class H(BaseHTTPRequestHandler):
                 return self._handle_save(json.loads(body.decode("utf-8")))
             if p == "/api/clear":
                 return self._handle_clear(json.loads(body.decode("utf-8")))
+            if p == "/api/mockcfg":
+                j = json.loads(body.decode("utf-8"))
+                CFG["mock"] = bool(j.get("mock"))
+                with open(CFG_PATH, "w", encoding="utf-8") as f:
+                    json.dump(CFG, f, ensure_ascii=False, indent=2)
+                self._json(200, {"ok": True, "mock": CFG["mock"]})
         except ApiError as ex:
             self._json(400, {"error": str(ex)})
         except Exception as ex:
@@ -1199,9 +1226,13 @@ class H(BaseHTTPRequestHandler):
         items = [resolve_item(i, user) for i in (res.get("items") or [])]
         tg = profile_targets(user)
         s = today_summary(user)
+        # 全天宏量 = 已入库合计 + 本次待保存餐（环形的"已吃"应包含眼前这顿）
+        day = {"protein": s["protein"] + sum(i.get("protein_g") or 0 for i in items),
+               "fat": s["fat"] + sum(i.get("fat_g") or 0 for i in items),
+               "carb": s["carb"] + sum(i.get("carb_g") or 0 for i in items)}
         self._json(200, {"items": items,
                          "targets": {"protein": tg["protein"], "fat": tg["fat"], "carb": tg["carb"]},
-                         "day": {"protein": s["protein"], "fat": s["fat"], "carb": s["carb"]}})
+                         "day": day})
 
     def _handle_save(self, j):
         """分析结果页确认保存：餐次用页面所选，items 用已识别结果"""
