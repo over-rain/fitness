@@ -425,6 +425,61 @@ INDEX = r"""<!doctype html><html lang="zh"><head>
  #fixPhotoBtn{border:1.5px solid #dfe4e8;background:#fafbfc;border-radius:10px;padding:8px 10px;font-size:13px}
  #fixThumb{width:42px;height:42px;border-radius:8px;object-fit:cover}
  .avload{padding:14px 0;text-align:center;color:#5c6670;font-size:13.5px}
+ /* ===== 玻璃冰块主题（互联网清新）=====
+    body.theme-glass 时整体覆盖为淡蓝渐变底 + 磨砂半透明卡片 + 冰蓝主色 */
+ body.theme-glass{background:linear-gradient(165deg,#d8ecfb 0%,#e9f4fb 45%,#e3f2f5 100%);color:#203442}
+ body.theme-glass .card,body.theme-glass .modal{background:rgba(255,255,255,.52);border:1px solid rgba(255,255,255,.65);
+  box-shadow:0 8px 32px rgba(84,140,190,.14);backdrop-filter:blur(18px) saturate(1.5);-webkit-backdrop-filter:blur(18px) saturate(1.5)}
+ body.theme-glass .hd h1{color:#1d3d54}
+ body.theme-glass .muted{color:#7d95ad}
+ body.theme-glass .num{color:#1d3d54}
+ body.theme-glass .seg button{background:rgba(255,255,255,.45);border-color:rgba(255,255,255,.7);color:#4a6b80}
+ body.theme-glass .seg button.on{background:linear-gradient(135deg,#3ea0ff,#6fc3ff);border-color:transparent;color:#fff}
+ body.theme-glass .gear{background:rgba(255,255,255,.45);border-color:rgba(255,255,255,.7)}
+ body.theme-glass .bar{background:rgba(255,255,255,.55)}
+ body.theme-glass .bar i{background:linear-gradient(90deg,#57b8f2,#8fd3ff)}
+ body.theme-glass .bar.warn i{background:linear-gradient(90deg,#f7b267,#f2884b)}
+ body.theme-glass .sumline{color:#5f7d92}
+ body.theme-glass .dinnerline{border-top:1px dashed rgba(255,255,255,.8);color:#6f8ba1}
+ body.theme-glass input[type=text]{background:rgba(255,255,255,.5);border-color:rgba(255,255,255,.75);color:#203442}
+ body.theme-glass input[type=text]:focus{border-color:#57b8f2;background:rgba(255,255,255,.75)}
+ body.theme-glass .btnrow .photo{background:linear-gradient(135deg,#3ea0ff,#6fc3ff)}
+ body.theme-glass .btnrow .send{background:linear-gradient(135deg,#2f9dd8,#5fb6e8)}
+ body.theme-glass #reply.ok{background:rgba(255,255,255,.5);border-left-color:#57b8f2}
+ body.theme-glass #reply.err{background:rgba(255,235,235,.55);border-left-color:#ef8a8a;color:#a04b4b}
+ body.theme-glass #reply.wait{background:rgba(255,255,255,.4);border-left-color:rgba(255,255,255,.8);color:#5f7d92}
+ body.theme-glass .spin{border-color:rgba(255,255,255,.9);border-top-color:#57b8f2}
+ body.theme-glass .chip{background:rgba(190,228,255,.5);color:#2a7fb8}
+ body.theme-glass .gsug{color:#7d95ad}
+ body.theme-glass .gtot{color:#1d3d54}
+ body.theme-glass .mrow{border-bottom:1px solid rgba(255,255,255,.55)}
+ body.theme-glass .mmain{background:transparent}
+ body.theme-glass .thumb{background:rgba(255,255,255,.6)}
+ body.theme-glass .kcell{color:#7d95ad}
+ body.theme-glass .kcell b{color:#1d3d54}
+ body.theme-glass .delzone2{background:#f9a8a8}
+ body.theme-glass .save{background:linear-gradient(135deg,#3ea0ff,#6fc3ff)}
+ body.theme-glass .grid input,body.theme-glass .grid select{background:rgba(255,255,255,.5);border-color:rgba(255,255,255,.75);color:#203442}
+ body.theme-glass .tabs button{background:rgba(255,255,255,.45);border-color:rgba(255,255,255,.7);color:#4a6b80}
+ body.theme-glass .tabs button.on{background:linear-gradient(135deg,#3ea0ff,#6fc3ff);border-color:transparent;color:#fff}
+ body.theme-glass .mback{background:rgba(120,160,190,.35);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
+ body.theme-glass .fixcnt{color:#7d95ad}
+ body.theme-glass .fixerr{background:rgba(255,235,235,.6)}
+ body.theme-glass #av{background:linear-gradient(165deg,#d8ecfb 0%,#e9f4fb 45%,#e3f2f5 100%);border-color:rgba(255,255,255,.4)}
+ body.theme-glass .avbar{background:transparent}
+ body.theme-glass #avBack,body.theme-glass #avMeal{background:rgba(255,255,255,.5)}
+ body.theme-glass #avmenu{background:rgba(255,255,255,.75);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px)}
+ body.theme-glass #avmenu button.on{background:rgba(190,228,255,.6);color:#1d6fa5}
+ body.theme-glass .avcard{background:rgba(255,255,255,.52);border:1px solid rgba(255,255,255,.65);
+  backdrop-filter:blur(18px) saturate(1.5);-webkit-backdrop-filter:blur(18px) saturate(1.5)}
+ body.theme-glass .avbig{color:#1d6fa5}
+ body.theme-glass .avitem{border-bottom:1px solid rgba(255,255,255,.55)}
+ body.theme-glass .avmacros div{border-right:1px solid rgba(255,255,255,.6)}
+ body.theme-glass .avmacros i{color:#1d3d54}
+ body.theme-glass .avbtns{background:rgba(255,255,255,.55);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px)}
+ body.theme-glass #avFix{background:rgba(255,255,255,.5);border-color:#57b8f2;color:#1d6fa5}
+ body.theme-glass #avSave{background:linear-gradient(135deg,#3ea0ff,#6fc3ff)}
+ body.theme-glass #fixText{background:rgba(255,255,255,.5);border-color:rgba(255,255,255,.75);color:#203442}
  .num{font-size:34px;font-weight:800;letter-spacing:-.5px;margin:2px 0 10px}
  .num small{font-size:14px;color:#8a9299;font-weight:500;margin-left:3px}
  .dinnerline{display:none;margin-top:9px;padding-top:8px;border-top:1px dashed #e6eaed;font-size:12.5px;color:#8a9299}
@@ -468,6 +523,7 @@ INDEX = r"""<!doctype html><html lang="zh"><head>
  <div style="display:flex;gap:6px;align-items:center">
   <div class="seg"><button id="u1"></button><button id="u2"></button></div>
   <button class="gear" id="gear" title="身体档案设置">⚙️</button>
+  <button class="gear" id="themeBtn" title="切换主题">🧊</button>
  </div></div>
 <div class="card">
  <div class="muted">今日剩余</div>
@@ -543,6 +599,10 @@ function clearReply(){const el=$("reply");el.className="";el.textContent="";}
 function openSettings(){$("mback").style.display="flex";loadProfile();}
 function closeSettings(){$("mback").style.display="none";}
 $("gear").onclick=openSettings;
+function applyTheme(t){document.body.classList.toggle("theme-glass",t==="glass");
+ $("themeBtn").textContent=t==="glass"?"🌿":"🧊";localStorage.setItem("fg_theme",t);}
+$("themeBtn").onclick=()=>applyTheme(localStorage.getItem("fg_theme")==="glass"?"warm":"glass");
+applyTheme(localStorage.getItem("fg_theme")||"warm");
 $("mclose").onclick=closeSettings;
 $("mback").onclick=e=>{if(e.target.id==="mback")closeSettings();};
 $("tProfile").onclick=()=>{$("tProfile").classList.add("on");$("tGeneral").classList.remove("on");
