@@ -414,10 +414,12 @@ INDEX = r"""<!doctype html><html lang="zh"><head>
  .avmacros div:last-child{border-right:0}
  .avmacros i{font-style:normal;display:block;font-size:18px;font-weight:700}
  .avmacros span{font-size:11.5px;color:#8a9299}
- .avm{text-align:center}
- .avnum{font-size:13.5px;font-weight:700;margin-top:3px;color:#191c1f}
- .avnum small{font-size:11px;color:#8a9299;font-weight:400}
- .avlbl{font-size:11.5px;color:#8a9299}
+ .mcards{display:flex;gap:9px;margin-top:10px}
+ .mcd{flex:1;background:rgba(255,255,255,.72);border-radius:16px;padding:10px 6px;text-align:center;border:1px solid rgba(223,233,245,.8)}
+ .mc-l{font-size:13px;font-weight:600;margin-bottom:4px}
+ .mc-e{font-size:11px;color:#8a9299;margin-top:6px;padding-top:6px;border-top:1px dashed #e3e9ee}
+ .mc-n{font-size:11px;color:#8a9299;margin-top:3px}
+ .mc-n b{color:#191c1f;font-size:12px}
  .avbtns{position:fixed;bottom:0;left:0;right:0;margin:0 auto;max-width:430px;display:flex;gap:9px;padding:10px 12px calc(10px + env(safe-area-inset-bottom));background:#fff;box-shadow:0 -2px 10px rgba(0,0,0,.06);z-index:45}
  #avFix:disabled,#avSave:disabled{opacity:.55}
  .fixerr{display:none;margin-top:8px;padding:8px 10px;background:#fef2f2;border-left:3px solid #ef4444;color:#991b1b;font-size:12.5px;border-radius:6px;word-break:break-all}
@@ -902,21 +904,23 @@ function renderAv(){
  if(avItems.length){
   $("avTot").style.display="block";
   $("avTot").innerHTML="<div class='avbig'>"+tot("kcal")+" <small>千卡</small></div>"+
-   "<div class='avmacros'>"+donut("蛋白",tot("protein_g"),avTarget.protein)+donut("脂肪",tot("fat_g"),avTarget.fat)+
-   donut("碳水",tot("carb_g"),avTarget.carb)+"</div>";
+   "<div class='mcards'>"+mcard("蛋白质",tot("protein_g"),avTarget.protein,"#2f8bff")+
+   mcard("脂肪",tot("fat_g"),avTarget.fat,"#8fc9ff")+
+   mcard("碳水",tot("carb_g"),avTarget.carb,"#1b4b9e")+"</div>";
  }else{$("avTot").innerHTML="";$("avTot").style.display="none";}
 }
-function donut(label,val,target){
+function mcard(label,val,target,color){
  const pct=target>0?Math.min(100,Math.round(val/target*100)):0;
- const r=16,c=2*Math.PI*r,off=c*(1-pct/100);
- const glass=document.body.classList.contains("theme-glass");
- const stroke=glass?"#3ea0ff":"#16a34a",track=glass?"rgba(255,255,255,.65)":"#e8ecef";
- return "<div class='avm'><svg width='42' height='42' viewBox='0 0 42 42'>"+
-  "<circle cx='21' cy='21' r='"+r+"' fill='none' stroke='"+track+"' stroke-width='4.5'/>"+
-  "<circle cx='21' cy='21' r='"+r+"' fill='none' stroke='"+stroke+"' stroke-width='4.5' stroke-linecap='round' "+
-  "stroke-dasharray='"+c+"' stroke-dashoffset='"+off+"' transform='rotate(-90 21 21)'/>"+
-  "<text x='21' y='25' text-anchor='middle' font-size='10.5' font-weight='700' fill='"+stroke+"'>"+pct+"%</text></svg>"+
-  "<div class='avnum'><b>"+val+"</b> g</div><div class='avlbl'>"+label+"</div></div>";
+ const R=32,C=2*Math.PI*R,off=C*(1-pct/100);
+ return "<div class='mcd'><div class='mc-l' style='color:"+color+"'>"+label+"</div>"+
+  "<svg width='84' height='84' viewBox='0 0 84 84'>"+
+  "<circle cx='42' cy='42' r='"+R+"' fill='none' stroke='#dfe9f5' stroke-width='9'/>"+
+  "<circle cx='42' cy='42' r='"+R+"' fill='none' stroke='"+color+"' stroke-width='9' stroke-linecap='round' "+
+  "stroke-dasharray='"+C+"' stroke-dashoffset='"+off+"' transform='rotate(-90 42 42)'/>"+
+  "<text x='42' y='38' text-anchor='middle' font-size='12' fill='#52708a'>"+label+"</text>"+
+  "<text x='42' y='58' text-anchor='middle' font-size='17' font-weight='700' fill='#1d3d54'>"+pct+"%</text></svg>"+
+  "<div class='mc-e'>已吃</div>"+
+  "<div class='mc-n'>已吃 <b>"+val+"g</b> / 目标 <b>"+(target||0)+"g</b></div></div>";
 }
 function closeAv(){$("av").style.display="none";avBusy=false;}
 $("avBack").onclick=closeAv;
