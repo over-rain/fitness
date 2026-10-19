@@ -135,7 +135,9 @@ def profile_targets(user_id):
     with open(path, "r", encoding="utf-8") as f:
         p = json.load(f)
     t = p["targets"]
-    return {"kcal": int(t["daily_kcal"]), "protein": int(t["protein_g"]), "name": p["display_name"]}
+    return {"kcal": int(t["daily_kcal"]), "protein": int(t["protein_g"]),
+            "fat": int(t.get("fat_g") or 0), "carb": int(t.get("carb_g") or 0),
+            "name": p["display_name"]}
 
 
 def load_food_table():
@@ -412,6 +414,10 @@ INDEX = r"""<!doctype html><html lang="zh"><head>
  .avmacros div:last-child{border-right:0}
  .avmacros i{font-style:normal;display:block;font-size:18px;font-weight:700}
  .avmacros span{font-size:11.5px;color:#8a9299}
+ .avm{text-align:center}
+ .avnum{font-size:13.5px;font-weight:700;margin-top:3px;color:#191c1f}
+ .avnum small{font-size:11px;color:#8a9299;font-weight:400}
+ .avlbl{font-size:11.5px;color:#8a9299}
  .avbtns{position:fixed;bottom:0;left:0;right:0;margin:0 auto;max-width:430px;display:flex;gap:9px;padding:10px 12px calc(10px + env(safe-area-inset-bottom));background:#fff;box-shadow:0 -2px 10px rgba(0,0,0,.06);z-index:45}
  #avFix:disabled,#avSave:disabled{opacity:.55}
  .fixerr{display:none;margin-top:8px;padding:8px 10px;background:#fef2f2;border-left:3px solid #ef4444;color:#991b1b;font-size:12.5px;border-radius:6px;word-break:break-all}
@@ -837,7 +843,7 @@ $("bSend").onclick=sendText;
 $("bPhoto").onclick=()=>$("photo").click();
 // ---- 分析结果页（照片专用：识别→修正→确认保存）----
 const MEALS=["早餐","午餐","晚餐","加餐"];
-let avItems=[],avB64=null,avMeal="早餐",avBusy=false;
+let avItems=[],avB64=null,avMeal="早餐",avBusy=false,avTarget={protein:0,fat:0,carb:0};
 $("avmenu").innerHTML=MEALS.map(m=>"<button data-m='"+m+"'>"+m+"</button>").join("");
 function hourMeal(h){return h<10?"早餐":h<14?"午餐":h<17?"加餐":h<21?"晚餐":"加餐";}
 function exifHour(buf){
@@ -894,10 +900,23 @@ function renderAv(){
   esc(it.portion||"")+"</span> "+esc(it.note||"")+"</div><div class='avk'>"+it.kcal+" 千卡</div></div>";
  $("avItems").innerHTML=h||"<div class='avload'><span class='spin'></span> 识别中…</div>";
  if(avItems.length){
+  $("avTot").style.display="block";
   $("avTot").innerHTML="<div class='avbig'>"+tot("kcal")+" <small>千卡</small></div>"+
-   "<div class='avmacros'><div><i>"+tot("protein_g")+"</i><span>蛋白 g</span></div>"+
-   "<div><i>"+tot("fat_g")+"</i><span>脂肪 g</span></div><div><i>"+tot("carb_g")+"</i><span>碳水 g</span></div></div>";
- }else $("avTot").innerHTML="";
+   "<div class='avmacros'>"+donut("蛋白",tot("protein_g"),avTarget.protein)+donut("脂肪",tot("fat_g"),avTarget.fat)+
+   donut("碳水",tot("carb_g"),avTarget.carb)+"</div>";
+ }else{$("avTot").innerHTML="";$("avTot").style.display="none";}
+}
+function donut(label,val,target){
+ const pct=target>0?Math.min(100,Math.round(val/target*100)):0;
+ const r=16,c=2*Math.PI*r,off=c*(1-pct/100);
+ const glass=document.body.classList.contains("theme-glass");
+ const stroke=glass?"#3ea0ff":"#16a34a",track=glass?"rgba(255,255,255,.65)":"#e8ecef";
+ return "<div class='avm'><svg width='42' height='42' viewBox='0 0 42 42'>"+
+  "<circle cx='21' cy='21' r='"+r+"' fill='none' stroke='"+track+"' stroke-width='4.5'/>"+
+  "<circle cx='21' cy='21' r='"+r+"' fill='none' stroke='"+stroke+"' stroke-width='4.5' stroke-linecap='round' "+
+  "stroke-dasharray='"+c+"' stroke-dashoffset='"+off+"' transform='rotate(-90 21 21)'/>"+
+  "<text x='21' y='25' text-anchor='middle' font-size='10.5' font-weight='700' fill='"+stroke+"'>"+pct+"%</text></svg>"+
+  "<div class='avnum'><b>"+val+"</b> g</div><div class='avlbl'>"+label+"</div></div>";
 }
 function closeAv(){$("av").style.display="none";avBusy=false;}
 $("avBack").onclick=closeAv;
@@ -953,7 +972,7 @@ $("fixOk").onclick=async()=>{
   const j=await api("/api/analyze",{method:"POST",headers:{"Content-Type":"application/json"},
    body:JSON.stringify({user:user,image:fixB64||avB64,text:t,prev:avItems})},200000);
   clearInterval(fi);
-  avItems=j.items||[];renderAv();hideBack("fixBack");
+  avItems=j.items||[];if(j.targets)avTarget=j.targets;renderAv();hideBack("fixBack");
  }catch(e){
   clearInterval(fi);
   fe.textContent="修正失败："+e.message+"（已识别结果未丢失，可重试或返回）";
@@ -980,7 +999,7 @@ $("photo").addEventListener("change",async e=>{
   avWait("识别中");
   const j=await api("/api/analyze",{method:"POST",headers:{"Content-Type":"application/json"},
    body:JSON.stringify({user:user,image:avB64})},200000);
-  avItems=j.items||[];renderAv();
+  avItems=j.items||[];if(j.targets)avTarget=j.targets;renderAv();
   if(!avItems.length)$("avItems").innerHTML="<div class='avload'>🤔 没识别出食物：点「AI 修正」描述一下，或返回重拍</div>";
  }catch(err){avDone();toast("识别失败："+err.message);closeAv();}
  avBusyUI(false);avBusy=false;
@@ -1171,7 +1190,9 @@ class H(BaseHTTPRequestHandler):
             extra = "\n用户拍摄了一张餐食照片，请识别其中全部食物。"
         res = llm_analyze(None, image, None, extra)
         items = [resolve_item(i, user) for i in (res.get("items") or [])]
-        self._json(200, {"items": items})
+        tg = profile_targets(user)
+        self._json(200, {"items": items,
+                         "targets": {"protein": tg["protein"], "fat": tg["fat"], "carb": tg["carb"]}})
 
     def _handle_save(self, j):
         """分析结果页确认保存：餐次用页面所选，items 用已识别结果"""
