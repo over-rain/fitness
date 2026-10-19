@@ -415,7 +415,9 @@ INDEX = r"""<!doctype html><html lang="zh"><head>
  .tabs button{flex:1;padding:9px;border:1px solid #d6dbdf;background:#fff;border-radius:10px;font-size:14px;color:#555}
  .tabs button.on{background:#16a34a;border-color:#16a34a;color:#fff;font-weight:600}
  .panel{display:none}.panel.on{display:block}
- #av{display:none;position:fixed;top:0;bottom:0;left:0;right:0;margin:0 auto;max-width:430px;background:#eef1f4;z-index:40;overflow-y:auto;padding-bottom:86px;border-left:1px solid #e3e7ea;border-right:1px solid #e3e7ea}
+ #av{display:none;position:fixed;top:0;bottom:0;left:0;right:0;margin:0 auto;max-width:430px;
+  background:linear-gradient(165deg,#aed2f5 0%,#d8ecfb 40%,#c9ecf2 75%,#bfe6ee 100%);
+  z-index:40;overflow-y:auto;padding-bottom:86px;border-left:1px solid #e3e7ea;border-right:1px solid #e3e7ea}
  .avbar{position:sticky;top:0;display:flex;align-items:center;justify-content:space-between;padding:10px 12px;background:#eef1f4;z-index:5}
  .avbar>button{border:0;background:#fff;border-radius:10px;font-size:14px}
  #avBack{width:34px;height:34px}
@@ -426,9 +428,10 @@ INDEX = r"""<!doctype html><html lang="zh"><head>
  #avmenu button.on{background:#f0fdf4;color:#16a34a;font-weight:700}
  #avImg{width:100%;max-height:300px;object-fit:cover;display:block;background:#dde2e6}
  .avwrap{padding:12px;display:flex;flex-direction:column;gap:var(--gap-card)}
- .avc{background:var(--color-card-bg);border-radius:var(--radius-card);border:1px solid var(--color-card-border);padding:var(--padding-card-normal);
-  box-shadow:var(--shadow-card);
-  backdrop-filter:blur(var(--card-backdrop-blur));-webkit-backdrop-filter:blur(var(--card-backdrop-blur))}
+ .avc{background:linear-gradient(135deg,rgba(255,255,255,.62) 0%,rgba(255,255,255,.34) 100%);
+  border-radius:var(--radius-card);border:1px solid rgba(255,255,255,.9);padding:var(--padding-card-normal);
+  box-shadow:var(--shadow-card),inset 0 1px 0 rgba(255,255,255,.85);
+  backdrop-filter:blur(16px) saturate(1.8);-webkit-backdrop-filter:blur(16px) saturate(1.8)}
  .avimgc{padding:var(--padding-card-image)}
  #avImg{width:100%;border-radius:16px;display:block;max-height:320px;object-fit:cover}
  .kchead{margin-bottom:2px}
@@ -443,7 +446,11 @@ INDEX = r"""<!doctype html><html lang="zh"><head>
  .avbig{font-size:34px;font-weight:600;color:var(--text-value-lg)}
  .avbig small{font-size:13px;color:var(--text-body);font-weight:500;margin-left:2px}
  .mcards{display:flex;gap:var(--gap-card);margin-top:10px}
- .mcd{flex:1;min-width:0;padding:14px 12px}
+ .mcd{flex:1;min-width:0;padding:14px 12px;
+  background:linear-gradient(135deg,rgba(255,255,255,.72) 0%,rgba(255,255,255,.42) 100%);
+  border-radius:18px;border:1px solid rgba(255,255,255,.85);
+  box-shadow:0 2px 8px rgba(150,180,220,.12),inset 0 1px 0 rgba(255,255,255,.8);
+  backdrop-filter:blur(10px) saturate(1.6);-webkit-backdrop-filter:blur(10px) saturate(1.6)}
  .mcrow{display:flex;align-items:center;gap:10px}
  .mcol{flex:1;text-align:left;min-width:0}
  .mc-l{font-size:13.5px;font-weight:600;color:var(--text-heading)}
@@ -539,7 +546,7 @@ INDEX = r"""<!doctype html><html lang="zh"><head>
  body.theme-glass .mback{background:rgba(120,160,190,.35);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
  body.theme-glass .fixcnt{color:#7d95ad}
  body.theme-glass .fixerr{background:rgba(255,235,235,.6)}
- body.theme-glass #av{background:linear-gradient(165deg,#cfe6fb 0%,#e6f3fc 45%,#dceff5 100%);border-color:rgba(255,255,255,.4)}
+ body.theme-glass #av{background:linear-gradient(165deg,#aed2f5 0%,#d8ecfb 40%,#c9ecf2 75%,#bfe6ee 100%);border-color:rgba(255,255,255,.4)}
  body.theme-glass .avbar{background:transparent}
  body.theme-glass #avBack,body.theme-glass #avMeal{background:rgba(255,255,255,.5)}
  body.theme-glass #avmenu{background:rgba(255,255,255,.75);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px)}
