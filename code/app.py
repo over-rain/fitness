@@ -526,6 +526,7 @@ INDEX = r"""<!doctype html><html lang="zh"><head>
  body.theme-glass .gsug{color:#7d95ad}
  body.theme-glass .chev{color:#3ea0ff}
  body.theme-glass .msub{color:#7d95ad}
+ body.theme-glass .delzone2{background:rgba(255,241,241,.9);border-color:#ffc9c9}
  body.theme-glass .sheet{background:rgba(246,250,253,.68);backdrop-filter:blur(24px) saturate(1.6);-webkit-backdrop-filter:blur(24px) saturate(1.6);border:1px solid rgba(255,255,255,.70)}
  body.theme-glass .einput{background:rgba(255,255,255,.6);border-color:rgba(255,255,255,.8)}
  body.theme-glass .pills button{background:rgba(255,255,255,.5);border-color:rgba(255,255,255,.8);color:#4a6b80}
@@ -550,7 +551,7 @@ INDEX = r"""<!doctype html><html lang="zh"><head>
  .dz{position:absolute;top:4px;bottom:4px;right:4px;width:70px;display:flex;align-items:center;justify-content:center;
   opacity:0;pointer-events:none;transition:opacity .18s}
  .mrow.open .dz{opacity:1;pointer-events:auto}
- .delzone2{width:100%;height:42px;border:0;background:#f8a8a8;color:#fff;font-size:13px;font-weight:600;border-radius:999px}
+ .delzone2{width:46px;height:46px;border-radius:50%;border:1.5px solid #ffc9c9;background:#fff1f1;color:#e03131;font-size:18px;cursor:pointer}
  .mmain{position:relative;display:flex;align-items:center;gap:10px;padding:8px;background:#fff;border-radius:14px;transition:transform .18s;touch-action:pan-y;user-select:none}
  .thumb{width:48px;height:48px;border-radius:12px;object-fit:cover;flex:none;background:#f0f2f4}
  .thumb.ph{display:flex;align-items:center;justify-content:center;font-size:20px}
@@ -599,7 +600,10 @@ INDEX = r"""<!doctype html><html lang="zh"><head>
   <button class="send" id="bSend">发送</button></div>
  <input type="file" id="photo" accept="image/*" capture="environment" style="display:none">
  <div id="reply"></div></div>
-<div class="card"><div class="muted" style="margin-bottom:4px">今日明细 · 右侧点改 · 左滑删除</div><div id="list"></div></div>
+<div class="card"><div style="display:flex;align-items:center;margin-bottom:6px">
+ <div class="muted" style="flex:1">今日明细 · 右侧点改 · 左滑删除</div>
+ <button id="clearBtn" style="border:0;background:none;color:#e03131;font-size:12.5px;cursor:pointer">清空今天</button></div>
+<div id="list"></div></div>
 <div id="av">
  <div class="avbar">
   <button id="avBack">‹</button>
@@ -668,10 +672,11 @@ INDEX = r"""<!doctype html><html lang="zh"><head>
   <div class="pills" id="ePills"></div>
   <div class="ebtns"><button class="ghost" id="eCancel">取消</button><button class="primary" id="eSave">保存修改</button></div>
  </div></div>
-<div class="mback" id="delBack" style="display:none">
+<div class="mback" id="clearBack" style="display:none">
  <div class="modal" style="max-width:320px">
-  <div class="etitle">确定删除这条食物记录吗？</div>
-  <div class="ebtns"><button class="ghost" id="dCancel">取消</button><button class="primary danger" id="dOk">删除</button></div>
+  <div class="etitle">确定清空今天的全部记录吗？</div>
+  <div class="muted" style="text-align:center;font-size:12px;padding-bottom:10px">清空后不可恢复（含当日全部条目与照片）</div>
+  <div class="ebtns"><button class="ghost" id="cCancel">取消</button><button class="primary danger" id="cOk">清空</button></div>
  </div></div>
 <div id="toast"></div>
 <script>
@@ -768,7 +773,7 @@ async function refresh(){
     "<div class='gsug'>热量建议："+sug(g.m)+" kcal</div>";
    for(const r of g.items){
     h+="<div class='mrow' data-id='"+r.id+"'>"+
-     "<div class='dz'><button class='delzone2' data-del='"+r.id+"'>删除</button></div>"+
+     "<div class='dz'><button class='delzone2' data-del='"+r.id+"' title='删除'>🗑</button></div>"+
      "<div class='mmain'>"+
      (r.photo?"<img class='thumb' src='/photo/"+r.id+"' alt=''>":"<div class='thumb ph'>🍳</div>")+
      "<div class='mname'>"+esc(r.food)+"<div class='msub'>"+
@@ -938,13 +943,19 @@ $("fixPhoto").addEventListener("change",async e=>{
 $("fixOk").onclick=async()=>{
  const t=$("fixText").value.trim();
  if(!t&&!fixB64){toast("写修正内容或附剩余照片");return;}
- avBusy=true;$("fixOk").disabled=true;$("fixOk").textContent="分析中…";
+ avBusy=true;$("fixOk").disabled=true;
+ const t0=Date.now();
+ $("fixOk").innerHTML="<span class='spin' style='border-color:rgba(255,255,255,.5);border-top-color:#fff;display:inline-block;vertical-align:-2px;margin-right:6px'></span>分析中… <b id='fs'>0s</b>";
+ const fi=setInterval(()=>{const el=$("fs");if(!el){clearInterval(fi);return;}
+  el.textContent=Math.round((Date.now()-t0)/1000)+"s";},500);
  const fe=$("fixErr");fe.classList.remove("show");
  try{
   const j=await api("/api/analyze",{method:"POST",headers:{"Content-Type":"application/json"},
    body:JSON.stringify({user:user,image:fixB64||avB64,text:t,prev:avItems})},200000);
+  clearInterval(fi);
   avItems=j.items||[];renderAv();hideBack("fixBack");
  }catch(e){
+  clearInterval(fi);
   fe.textContent="修正失败："+e.message+"（已识别结果未丢失，可重试或返回）";
   fe.classList.add("show");
  }
@@ -1016,13 +1027,17 @@ $("eSave").onclick=async()=>{
  }catch(e){toast("保存失败："+e.message);}
  $("eSave").disabled=false;$("eSave").textContent="保存修改";editBusy=false;
 };
-function delId(id){delId0=id;showBack("delBack");}
-$("dCancel").onclick=()=>hideBack("delBack");
-$("dOk").onclick=async()=>{
- hideBack("delBack");
- try{await api("/api/correct",{method:"POST",headers:{"Content-Type":"application/json"},
-  body:JSON.stringify({id:delId0,action:"delete"})});toast("已删除");bump();refresh();}
- catch(e){toast("删除失败："+e.message);}
+async function delId(id){try{await api("/api/correct",{method:"POST",headers:{"Content-Type":"application/json"},
+  body:JSON.stringify({id:id,action:"delete"})});toast("已删除");bump();refresh();}catch(e){toast("删除失败："+e.message);}}
+let clearing=false;
+$("clearBtn").onclick=()=>showBack("clearBack");
+$("cCancel").onclick=()=>hideBack("clearBack");
+$("cOk").onclick=async()=>{
+ hideBack("clearBack");if(clearing)return;clearing=true;
+ try{const j=await api("/api/clear",{method:"POST",headers:{"Content-Type":"application/json"},
+  body:JSON.stringify({user:user})});toast("已清空 "+j.cleared+" 条");bump();refresh();}
+ catch(e){toast("清空失败："+e.message);}
+ clearing=false;
 };
 function bump(){const el=$("remain");el.classList.remove("bump");void el.offsetWidth;el.classList.add("bump");}
 // 点空白处收起滑开的删除区
@@ -1094,7 +1109,7 @@ class H(BaseHTTPRequestHandler):
 
     def do_POST(self):
         p = urlparse(self.path).path
-        if p not in ("/api/meal", "/api/correct", "/api/profile", "/api/analyze", "/api/save"):
+        if p not in ("/api/meal", "/api/correct", "/api/profile", "/api/analyze", "/api/save", "/api/clear"):
             return self._send(404, "text/plain", b"not found")
         if not self._authed():
             return self._json(401, {"error": "需要访问码"})
@@ -1111,10 +1126,28 @@ class H(BaseHTTPRequestHandler):
                 return self._handle_analyze(json.loads(body.decode("utf-8")))
             if p == "/api/save":
                 return self._handle_save(json.loads(body.decode("utf-8")))
+            if p == "/api/clear":
+                return self._handle_clear(json.loads(body.decode("utf-8")))
         except ApiError as ex:
             self._json(400, {"error": str(ex)})
         except Exception as ex:
             self._json(500, {"error": repr(ex)})
+
+    def _handle_clear(self, j):
+        """清空今日该用户全部记录（含照片文件）"""
+        user = j.get("user")
+        if user not in USERS:
+            raise ApiError("user 必须是 beifeng / gagayouna")
+        date = datetime.now().strftime("%Y-%m-%d")
+        with db() as conn:
+            rows = conn.execute("SELECT id FROM meals WHERE user_id=? AND date=?", (user, date)).fetchall()
+            conn.execute("DELETE FROM meals WHERE user_id=? AND date=?", (user, date))
+        for r in rows:
+            try:
+                os.remove(os.path.join(DATA, "meals", "record_%d.jpg" % r["id"]))
+            except OSError:
+                pass
+        self._json(200, {"ok": True, "cleared": len(rows)})
 
     def _handle_analyze(self, j):
         """只识别不入库：分析结果页专用。支持带 prev+修正文本/剩余照片的重新分析"""
