@@ -514,6 +514,8 @@ INDEX = r"""<!doctype html><html lang="zh"><head>
  body.theme-glass #avFix{background:rgba(255,255,255,.5);border-color:#57b8f2;color:#1d6fa5}
  body.theme-glass #avSave{background:linear-gradient(135deg,#3ea0ff,#6fc3ff)}
  body.theme-glass #fixText{background:rgba(255,255,255,.5);border-color:rgba(255,255,255,.75);color:#203442}
+ body.theme-glass #fixBack .muted{color:#3f607a}
+ #fixBack .muted{color:#5c6670}
  body.theme-glass .gcard{background:rgba(255,255,255,.40);border:1px solid rgba(255,255,255,.70);
   box-shadow:0 8px 32px rgba(84,140,190,.16);backdrop-filter:blur(24px) saturate(1.6);-webkit-backdrop-filter:blur(24px) saturate(1.6)}
  body.theme-glass .mrow{border-bottom:0;box-shadow:0 1px 6px rgba(84,140,190,.10)}
@@ -868,11 +870,14 @@ let avInt=null;
 function avWait(msg){$("avItems").innerHTML="<div class='avload'><span class='spin'></span> "+msg+" <b id='avel'></b></div>";
  const t0=Date.now();if(avInt)clearInterval(avInt);
  avInt=setInterval(()=>{const el=$("avel");if(!el){if(avInt)clearInterval(avInt);return;}
-  const s=Math.round((Date.now()-t0)/1000);el.textContent=s+"s"+(s>15?" · 网络高峰，再等等":"");},500);}
+  const s=Math.round((Date.now()-t0)/1000);
+  const ph=s<10?"":s<25?" · 正在分析份量…":s<45?" · 正在计算热量…":" · 网络高峰，马上好…";
+  el.textContent=s+"s"+ph;},500);}
 function avDone(){if(avInt)clearInterval(avInt);avInt=null;}
 function avBusyUI(on){$("avFix").disabled=on;$("avSave").disabled=on;}
 function renderAv(){
  avDone();
+ $("avTot").style.display=avItems.length?"block":"none";
  $("avMeal").textContent="今天 "+avMeal+" ▼";
  $("avmenu").querySelectorAll("button").forEach(b=>b.classList.toggle("on",b.dataset.m===avMeal));
  const tot=k=>avItems.reduce((s,i)=>s+(i[k]||0),0);
@@ -980,7 +985,7 @@ function openEdit(id){
  showBack("editBack");requestAnimationFrame(()=>$("editBack").classList.add("open"));
 }
 function closeEdit(){$("editBack").classList.remove("open");hideBack("editBack");}
-$("editBack").onclick=e=>{if(e.target.id==="editBack")closeEdit();};
+$("editBack").onclick=e=>{if(!e.target.closest(".sheet"))closeEdit();};
 $("eClose").onclick=closeEdit;$("eCancel").onclick=closeEdit;
 $("eThumb").onclick=()=>$("ePhoto").click();$("eThumbPh").onclick=()=>$("ePhoto").click();
 $("ePhoto").addEventListener("change",async e=>{
