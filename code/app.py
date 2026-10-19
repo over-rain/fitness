@@ -427,8 +427,14 @@ INDEX = r"""<!doctype html><html lang="zh"><head>
  .avload{padding:14px 0;text-align:center;color:#5c6670;font-size:13.5px}
  /* ---- 编辑抽屉 & 删除确认 ---- */
  .mback.up{align-items:flex-end;padding:0}
+ .mback{animation:fadeIn .22s}
+ .mback.closing{animation:fadeOut .22s forwards}
+ .modal{animation:popIn .24s cubic-bezier(.2,.8,.2,1)}
+ @keyframes fadeIn{from{opacity:0}}
+ @keyframes fadeOut{to{opacity:0}}
+ @keyframes popIn{from{transform:scale(.92);opacity:0}}
  .sheet{background:#fff;border-radius:22px 22px 0 0;max-width:430px;width:100%;padding:16px 16px calc(16px + env(safe-area-inset-bottom));
-  transform:translateY(100%);transition:transform .28s cubic-bezier(.2,.8,.2,1)}
+  transform:translateY(100%);transition:transform .3s cubic-bezier(.34,1.25,.4,1)}
  .mback.up.open .sheet{transform:translateY(0)}
  .etitle{text-align:center;font-size:16px;font-weight:700;margin-bottom:12px}
  .ehead{display:flex;align-items:center;gap:10px;margin-bottom:6px}
@@ -448,6 +454,11 @@ INDEX = r"""<!doctype html><html lang="zh"><head>
  .dtext{text-align:center;font-size:14.5px;padding:6px 0 14px}
  @keyframes bump{30%{transform:scale(1.1);color:#16a34a}}
  .num.bump{animation:bump .5s}
+ button{transition:transform .12s}
+ .btnrow button:active,.pills button:active,.seg button:active,.save:active,.ebtns button:active,
+ #avSave:active,#avFix:active,.gear:active,.delzone2:active{transform:scale(.95)}
+ #av,.mback{-webkit-overflow-scrolling:touch}
+ #av{animation:fadeIn .2s}
  /* ===== 玻璃冰块主题（互联网清新）=====
     body.theme-glass 时整体覆盖为淡蓝渐变底 + 磨砂半透明卡片 + 冰蓝主色 */
  body.theme-glass{background:linear-gradient(165deg,#cfe6fb 0%,#e6f3fc 45%,#dceff5 100%);color:#203442}
@@ -670,8 +681,8 @@ $("u1").textContent="🧑 邶风";$("u2").textContent="👩 gagayouna";
 $("u1").onclick=()=>{user="beifeng";localStorage.setItem("fg_user",user);paintSeg();clearReply();refresh();if($("mback").style.display==="flex")loadProfile();};
 $("u2").onclick=()=>{user="gagayouna";localStorage.setItem("fg_user",user);paintSeg();clearReply();refresh();if($("mback").style.display==="flex")loadProfile();};
 function clearReply(){const el=$("reply");el.className="";el.textContent="";}
-function openSettings(){$("mback").style.display="flex";loadProfile();}
-function closeSettings(){$("mback").style.display="none";}
+function openSettings(){showBack("mback");loadProfile();}
+function closeSettings(){hideBack("mback");}
 $("gear").onclick=openSettings;
 function applyTheme(t){document.body.classList.toggle("theme-glass",t==="glass");
  $("themeBtn").textContent=t==="glass"?"🌿":"🧊";localStorage.setItem("fg_theme",t);}
@@ -896,8 +907,10 @@ let fixB64=null;
 $("avFix").onclick=()=>{if(avBusy||!avB64)return;
  fixB64=null;$("fixText").value="";$("fixCnt").textContent="0/200";
  $("fixThumb").style.display="none";$("fixPhotoHint").textContent="可选：拍剩余的盘子，AI 按图扣减";
- $("fixBack").style.display="flex";$("fixText").focus();};
-$("fixClose").onclick=()=>$("fixBack").style.display="none";
+ $("fixErr").classList.remove("show");
+ showBack("fixBack");$("fixText").focus();};
+$("fixClose").onclick=()=>hideBack("fixBack");
+$("fixBack").onclick=e=>{if(e.target.id==="fixBack")hideBack("fixBack");};
 $("fixText").addEventListener("input",e=>{$("fixCnt").textContent=e.target.value.length+"/200";});
 $("fixPhotoBtn").onclick=()=>$("fixPhoto").click();
 $("fixPhoto").addEventListener("change",async e=>{
@@ -922,7 +935,7 @@ $("fixOk").onclick=async()=>{
  try{
   const j=await api("/api/analyze",{method:"POST",headers:{"Content-Type":"application/json"},
    body:JSON.stringify({user:user,image:fixB64||avB64,text:t,prev:avItems})},200000);
-  avItems=j.items||[];renderAv();$("fixBack").style.display="none";
+  avItems=j.items||[];renderAv();hideBack("fixBack");
  }catch(e){
   fe.textContent="修正失败："+e.message+"（已识别结果未丢失，可重试或返回）";
   fe.classList.add("show");
@@ -964,9 +977,10 @@ function openEdit(id){
  $("ePills").innerHTML=MEALS.map(m=>"<button data-m='"+m+"' class='"+(m===r.meal_type?"on":"")+"'>"+m+"</button>").join("");
  $("ePills").querySelectorAll("button").forEach(b=>b.onclick=()=>{
   $("ePills").querySelectorAll("button").forEach(x=>x.classList.remove("on"));b.classList.add("on");});
- $("editBack").style.display="flex";requestAnimationFrame(()=>$("editBack").classList.add("open"));
+ showBack("editBack");requestAnimationFrame(()=>$("editBack").classList.add("open"));
 }
-function closeEdit(){$("editBack").classList.remove("open");setTimeout(()=>$("editBack").style.display="none",280);}
+function closeEdit(){$("editBack").classList.remove("open");hideBack("editBack");}
+$("editBack").onclick=e=>{if(e.target.id==="editBack")closeEdit();};
 $("eClose").onclick=closeEdit;$("eCancel").onclick=closeEdit;
 $("eThumb").onclick=()=>$("ePhoto").click();$("eThumbPh").onclick=()=>$("ePhoto").click();
 $("ePhoto").addEventListener("change",async e=>{
@@ -994,10 +1008,10 @@ $("eSave").onclick=async()=>{
  }catch(e){toast("保存失败："+e.message);}
  $("eSave").disabled=false;$("eSave").textContent="保存修改";editBusy=false;
 };
-function delId(id){delId0=id;$("delBack").style.display="flex";}
-$("dCancel").onclick=()=>$("delBack").style.display="none";
+function delId(id){delId0=id;showBack("delBack");}
+$("dCancel").onclick=()=>hideBack("delBack");
 $("dOk").onclick=async()=>{
- $("delBack").style.display="none";
+ hideBack("delBack");
  try{await api("/api/correct",{method:"POST",headers:{"Content-Type":"application/json"},
   body:JSON.stringify({id:delId0,action:"delete"})});toast("已删除");bump();refresh();}
  catch(e){toast("删除失败："+e.message);}
