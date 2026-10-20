@@ -394,7 +394,7 @@ INDEX = r"""<!doctype html><html lang="zh"><head>
  --shadow-card:0 4px 16px rgba(160,200,170,0.15),0 1px 4px rgba(160,200,170,0.08);
  --color-divider:rgba(160,200,170,0.3);
  --ring-bg:#E3F3E7;--ring-progress:#57C374;
- --bar-track:rgba(255,255,255,0.55);
+ --bar-track:#D9EEDD;
 }
 [data-theme="meal"]{
  --color-page-bg:#E8F2FC;
@@ -407,7 +407,7 @@ INDEX = r"""<!doctype html><html lang="zh"><head>
  --shadow-card:0 4px 16px rgba(150,180,220,0.15),0 1px 4px rgba(150,180,220,0.08);
  --color-divider:rgba(180,205,235,0.3);
  --ring-bg:#E5EEF9;--ring-progress:#3B88ED;
- --bar-track:rgba(255,255,255,0.55);
+ --bar-track:#D9E6F7;
 }
 /* ===== 基础 ===== */
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
@@ -489,8 +489,9 @@ input[type=text]:focus{border-color:var(--color-primary)}
 .dz{position:absolute;top:4px;bottom:4px;right:4px;width:70px;display:flex;align-items:center;justify-content:center;
  opacity:0;pointer-events:none;transition:opacity .18s}
 .mrow.open .dz{opacity:1;pointer-events:auto}
-.delzone2{width:46px;height:46px;border-radius:50%;border:1.5px solid var(--color-danger-border);
- background:var(--color-danger-soft);color:var(--color-danger);cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0}
+.delzone2{width:64px;height:40px;border-radius:12px;border:0;
+ background:var(--color-danger);color:#fff;font-size:13px;font-weight:600;cursor:pointer;
+ display:flex;align-items:center;justify-content:center;padding:0}
 .thumb.ph{color:var(--text-secondary)}
 .mmain{position:relative;display:flex;align-items:center;gap:10px;padding:8px;background:var(--color-card-bg);
  border-radius:14px;transition:transform .18s;touch-action:pan-y;user-select:none}
@@ -514,7 +515,7 @@ input[type=text]:focus{border-color:var(--color-primary)}
 .avbar>button{border:1px solid var(--color-card-border);background:var(--color-card-bg);
  border-radius:var(--radius-btn);font-size:14px;color:var(--text-main);
  box-shadow:0 1px 4px var(--shadow-card-2)}
-#avBack{width:38px;height:38px;font-weight:700;font-size:16px}
+#avBack{width:40px;height:40px;font-weight:700;font-size:20px}
 #avMeal{padding:10px 20px;font-size:15px;font-weight:700}
 #avmenu{position:fixed;top:56px;left:50%;transform:translateX(-50%);background:var(--color-card-bg);
  border:1px solid var(--color-card-border);box-shadow:var(--shadow-card);display:none;z-index:60;overflow:hidden}
@@ -529,12 +530,14 @@ input[type=text]:focus{border-color:var(--color-primary)}
 .mcd{flex:1;min-width:0;padding:14px 12px}
 .mcrow{display:flex;align-items:center;gap:10px}
 .mcol{flex:1;text-align:left;min-width:0}
-.mc-l{font-size:13.5px;font-weight:600;color:var(--text-main)}
-.mc-v{font-size:16px;font-weight:600;color:var(--text-main);margin-top:2px}
-.mc-n{font-size:11.5px;color:var(--text-secondary);margin-top:10px;padding-top:8px;border-top:1px solid var(--color-divider)}
+.mc-l{font-size:12.5px;font-weight:600;color:var(--text-main)}
+.mc-v{font-size:15px;font-weight:600;color:var(--text-main);margin-top:2px}
+.mc-n{font-size:10.5px;color:var(--text-secondary);margin-top:8px;padding-top:7px;
+ border-top:1px solid var(--color-divider);white-space:nowrap;overflow:hidden}
 .mc-n b{color:var(--text-main);font-size:12.5px}
 .ring-track{stroke:var(--ring-bg)}
 .ring-fill{stroke:var(--ring-progress)}
+#avKcal{padding:16px 20px}
 .avitem{padding:10px 2px;border-bottom:1px solid var(--color-divider);
  display:flex;justify-content:space-between;gap:8px;align-items:baseline}
 .avitem:last-child{border-bottom:0}
@@ -644,8 +647,8 @@ button{transition:transform .12s;font-family:var(--font-family)}
  <input type="file" id="photo" accept="image/*" capture="environment" style="display:none">
  <div id="reply"></div></div>
 <div class="card"><div style="display:flex;align-items:center;margin-bottom:6px">
- <div class="muted" style="flex:1">今日明细 · 右侧点改 · 左滑删除</div>
- <button id="clearBtn" style="border:0;background:none;color:var(--color-danger);font-size:12.5px;cursor:pointer">清空今天</button></div>
+ <div style="flex:1"></div>
+ <button id="clearBtn" style="border:1px solid var(--color-danger-border);background:var(--color-danger-soft);color:var(--color-danger);font-size:12.5px;font-weight:600;border-radius:var(--radius-tag);padding:6px 14px;cursor:pointer">清空今天</button></div>
 <div id="list"></div></div>
 <div class="mback up" id="editBack" style="display:none">
  <div class="sheet">
@@ -701,7 +704,7 @@ button{transition:transform .12s;font-family:var(--font-family)}
 </div>
 <div class="view" data-theme="meal" id="av">
  <div class="avbar">
-  <button id="avBack">‹</button>
+  <button id="avBack">←</button>
   <button id="avMeal"></button>
   <div style="width:34px"></div>
  </div>
@@ -827,10 +830,7 @@ async function refresh(){
     "<div class='gsug'>热量建议："+sug(g.m)+" kcal</div>";
    for(const r of g.items){
     h+="<div class='mrow' data-id='"+r.id+"'>"+
-     "<div class='dz'><button class='delzone2' data-del='"+r.id+"' aria-label='删除"+esc(r.food)+"'>"+
-     "<svg width='20' height='20' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' aria-hidden='true'>"+
-     "<path d='M3 6h18'/><path d='M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2'/>"+
-     "<path d='M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6'/><path d='M10 11v6M14 11v6'/></svg></button></div>"+
+     "<div class='dz'><button class='delzone2' data-del='"+r.id+"' aria-label='删除"+esc(r.food)+"'>删除</button></div>"+
      "<div class='mmain'>"+
      (r.photo?"<img class='thumb' src='/photo/"+r.id+"' alt=''>":"<div class='thumb ph' role='img' aria-label='暂无照片'>" +
      "<svg width='26' height='26' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='1.6' stroke-linecap='round' aria-hidden='true'><path d='M4 13h16'/><path d='M5 13a7 7 0 0 0 14 0z'/></svg></div>")+
