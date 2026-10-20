@@ -375,7 +375,7 @@ INDEX = r"""<!doctype html><html lang="zh"><head>
  --padding-card-normal:24px;--padding-card-image:8px;--gap-card:16px;
  --card-backdrop-blur:12px;
  --font-family:system-ui,-apple-system,"PingFang SC",sans-serif;
- --font-size-heading:18px;--font-size-big-number:48px;--font-size-unit:20px;
+ --font-size-heading:18px;--font-size-big-number:40px;--font-size-unit:20px;
  --font-size-body:16px;--font-size-small:14px;
  --font-weight-bold:700;--font-weight-normal:400;
  --color-danger:#E03131;--color-danger-soft:#FFF1F1;--color-danger-border:#FFC9C9;
@@ -527,10 +527,10 @@ input[type=text]:focus{border-color:var(--color-primary)}
 .kchead{margin-bottom:2px}
 .kctagrow{display:flex;justify-content:flex-end;margin-top:10px}
 .avmrow3{display:flex;gap:var(--gap-card)}
-.mcd{flex:1;min-width:0;padding:14px 12px}
+.mcd{flex:1;min-width:0;padding:12px 8px}
 .mcrow{display:flex;align-items:center;gap:10px}
 .mcol{flex:1;text-align:left;min-width:0}
-.mc-l{font-size:12.5px;font-weight:600;color:var(--text-main)}
+.mc-l{font-size:12.5px;font-weight:600;color:var(--text-main);white-space:nowrap}
 .mc-v{font-size:15px;font-weight:600;color:var(--text-main);margin-top:2px}
 .mc-n{font-size:10.5px;color:var(--text-secondary);margin-top:8px;padding-top:7px;
  border-top:1px solid var(--color-divider);white-space:nowrap;overflow:hidden}
@@ -647,8 +647,8 @@ button{transition:transform .12s;font-family:var(--font-family)}
  <input type="file" id="photo" accept="image/*" capture="environment" style="display:none">
  <div id="reply"></div></div>
 <div class="card"><div style="display:flex;align-items:center;margin-bottom:6px">
- <div style="flex:1"></div>
- <button id="clearBtn" style="border:1px solid var(--color-danger-border);background:var(--color-danger-soft);color:var(--color-danger);font-size:12.5px;font-weight:600;border-radius:var(--radius-tag);padding:6px 14px;cursor:pointer">清空今天</button></div>
+ <div class="muted" style="flex:1">今日明细</div>
+ <button id="clearBtn" style="border:1px solid var(--color-danger-border);background:var(--color-danger-soft);color:var(--color-danger);font-size:12.5px;font-weight:600;border-radius:var(--radius-tag);padding:6px 14px;cursor:pointer">清空</button></div>
 <div id="list"></div></div>
 <div class="mback up" id="editBack" style="display:none">
  <div class="sheet">
@@ -704,7 +704,7 @@ button{transition:transform .12s;font-family:var(--font-family)}
 </div>
 <div class="view" data-theme="meal" id="av">
  <div class="avbar">
-  <button id="avBack">←</button>
+  <button id="avBack" aria-label="返回"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5"/><path d="m12 19-7-7 7-7"/></svg></button>
   <button id="avMeal"></button>
   <div style="width:34px"></div>
  </div>
