@@ -413,6 +413,8 @@ INDEX = r"""<!doctype html><html lang="zh"><head>
 body{font-family:var(--font-family);margin:0;color:var(--text-main)}
 .view{min-height:100vh;background:var(--color-page-bg);color:var(--text-main)}
 #homeView{max-width:430px;margin:0 auto;padding:14px 12px 30px}
+#homeView .card{margin-bottom:var(--gap-card)}
+#homeView .card:last-child{margin-bottom:0}
 /* ===== 统一组件（两主题共用，只读变量）===== */
 .card{background:var(--color-card-bg);border:1px solid var(--color-card-border);border-radius:var(--radius-lg);
  backdrop-filter:blur(var(--card-backdrop-blur));-webkit-backdrop-filter:blur(var(--card-backdrop-blur));
@@ -460,7 +462,7 @@ input[type=text]:focus{border-color:var(--color-primary)}
  font-weight:600;color:#fff;transition:opacity .2s}
 .btnrow button:disabled{opacity:.45}
 .photo{background:var(--color-primary)}
-.send{background:var(--color-card-bg);border:1.5px solid var(--color-primary);color:var(--color-primary)}
+.btnrow .send{background:var(--color-card-bg);border:1.5px solid var(--color-primary);color:var(--color-primary)}
 #reply{margin-top:11px;border-radius:12px;padding:12px 13px;font-size:13.5px;line-height:1.75;white-space:pre-wrap;display:none}
 #reply.ok{display:block;background:var(--color-card-bg);border-left:3px solid var(--color-primary)}
 #reply.err{display:block;background:var(--color-danger-soft);border-left:3px solid var(--color-danger);color:var(--color-danger)}
@@ -506,11 +508,12 @@ input[type=text]:focus{border-color:var(--color-primary)}
  border-left:1px solid var(--color-card-border);border-right:1px solid var(--color-card-border);
  -webkit-overflow-scrolling:touch;animation:fadeIn .2s}
 .avbar{position:sticky;top:0;display:flex;align-items:center;justify-content:space-between;
- padding:10px 12px;background:var(--color-page-bg);z-index:5}
+ padding:12px 14px;background:var(--color-page-bg);z-index:5}
 .avbar>button{border:1px solid var(--color-card-border);background:var(--color-card-bg);
- border-radius:10px;font-size:14px;color:var(--text-main)}
-#avBack{width:34px;height:34px}
-#avMeal{padding:9px 16px;border-radius:var(--radius-tag);font-weight:600;color:var(--text-main)}
+ border-radius:var(--radius-btn);font-size:14px;color:var(--text-main);
+ box-shadow:0 1px 4px var(--shadow-card-2)}
+#avBack{width:38px;height:38px;font-weight:700}
+#avMeal{padding:10px 18px;font-size:14px}
 #avmenu{position:fixed;top:56px;left:50%;transform:translateX(-50%);background:var(--color-card-bg);
  border:1px solid var(--color-card-border);box-shadow:var(--shadow-card);display:none;z-index:60;overflow:hidden}
 #avmenu button{display:block;width:100%;border:0;background:none;padding:11px 30px;
