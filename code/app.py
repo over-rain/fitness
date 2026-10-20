@@ -14,6 +14,7 @@ fitness v1 本地版 —— 拍照记餐 + 剩余额度（零依赖，仅 Python
   POST /api/correct      JSON: {id, action:"delete"|"edit", kcal?, food?}
 """
 import base64
+import hmac
 import json
 import os
 import re
@@ -785,10 +786,15 @@ $("s_save").onclick=async()=>{
 };
 paintSeg();
 const esc=s=>String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+let TOKEN=localStorage.getItem("fg_token")||"";
 async function api(path,opts,tmo){const ctl=("AbortController"in window)?new AbortController():null;
  const to=ctl?setTimeout(()=>ctl.abort(),tmo||180000):null;
- try{const r=await fetch(path,Object.assign({},opts,ctl?{signal:ctl.signal}:{}));
+ const h=Object.assign({},(opts&&opts.headers)||{});
+ if(TOKEN)h["X-Access-Token"]=TOKEN;
+ try{const r=await fetch(path,Object.assign({},opts,{headers:h},ctl?{signal:ctl.signal}:{}));
   let j=null;try{j=await r.json()}catch(_){}
+  if(r.status===401){const c=prompt("此站受访问码保护，请输入访问码：");
+   if(c){TOKEN=c;localStorage.setItem("fg_token",c);throw new Error("访问码已记录，请重试刚才的操作");}}
   if(!r.ok)throw new Error((j&&j.error)||("HTTP "+r.status));return j;}
  finally{if(to)clearTimeout(to);}}
 let busy=false,timer=null;
@@ -1143,7 +1149,7 @@ class H(BaseHTTPRequestHandler):
         code = CFG.get("access_code") or ""
         if not code:
             return True
-        return self.headers.get("X-Access-Token") == code
+        return hmac.compare_digest(self.headers.get("X-Access-Token") or "", code)
 
     def do_GET(self):
         p = urlparse(self.path).path
