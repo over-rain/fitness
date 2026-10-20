@@ -345,7 +345,7 @@ def dinner_tip(rows, remaining):
     meat = max(int((rest * 0.45) / 1.43 / 10) * 10, 0)   # 瘦肉 ~143kcal/100g
     tip = f"晚餐建议 ≈{budget}kcal ≈ 米饭{rice}g + 瘦肉{meat}g + 蔬菜300g"
     if raw > 800 and remaining - 800 > 200:
-        tip += "｜今天余量大，加餐/夜宵还有空间"
+        tip += "｜今天余量较大"
     return tip
 
 
