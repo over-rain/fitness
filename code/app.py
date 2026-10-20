@@ -668,6 +668,30 @@ button{transition:transform .12s;font-family:var(--font-family)}
   <div class="muted" style="text-align:center;font-size:12px;padding-bottom:10px">清空后不可恢复（含当日全部条目与照片）</div>
   <div class="ebtns"><button class="ghost" id="cCancel">取消</button><button class="primary danger" id="cOk">清空</button></div>
  </div></div>
+<div class="mback" id="mback">
+ <div class="modal">
+  <div class="mhead"><b>设置</b><button id="mclose">✕</button></div>
+  <div class="tabs"><button class="tab on" id="tProfile">👤 个人信息</button><button class="tab" id="tGeneral">⚙️ 通用</button></div>
+  <div class="panel on" id="pProfile">
+   <div class="muted" style="margin-bottom:9px">保存后自动按 Mifflin-St Jeor 重算热量线</div>
+   <div class="grid">
+    <div><label>名称</label><input type="text" id="s_name"></div>
+    <div><label>性别</label><select id="s_gender"><option value="male">男</option><option value="female">女</option></select></div>
+    <div><label>年龄</label><input type="number" id="s_age"></div>
+    <div><label>身高 cm</label><input type="number" id="s_height"></div>
+    <div><label>体重 kg</label><input type="number" step="0.1" id="s_weight"></div>
+    <div><label>目标体重 kg</label><input type="number" step="0.1" id="s_targetw"></div>
+    <div><label>周练天数</label><input type="number" min="0" max="7" id="s_days"></div>
+   </div>
+   <button class="save" id="s_save">💾 保存并重算</button>
+   <div class="muted" id="s_hint" style="margin-top:9px"></div>
+  </div>
+  <div class="panel" id="pGeneral">
+   <label style="display:flex;align-items:flex-start;gap:9px;cursor:pointer;padding:4px 2px">
+    <input type="checkbox" id="mockChk" style="width:17px;height:17px;margin-top:2px">
+    <span style="font-size:13.5px">测试模式<br><span class="muted" style="font-size:11.5px">识别立即返回示例数据，不请求大模型（用于测试界面与入库流程）</span></span></label>
+  </div>
+ </div></div>
 </div>
 <div class="view" data-theme="meal" id="av">
  <div class="avbar">
