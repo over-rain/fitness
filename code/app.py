@@ -697,6 +697,7 @@ button{transition:transform .12s;font-family:var(--font-family)}
 </div>
 <div id="toast"></div>
 
+<script>
 const $=id=>document.getElementById(id);
 window.onerror=function(m){try{toast("页面错误:"+m);}catch(_){}};
 let user=localStorage.getItem("fg_user")||"beifeng";
