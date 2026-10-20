@@ -486,7 +486,8 @@ input[type=text]:focus{border-color:var(--color-primary)}
  opacity:0;pointer-events:none;transition:opacity .18s}
 .mrow.open .dz{opacity:1;pointer-events:auto}
 .delzone2{width:46px;height:46px;border-radius:50%;border:1.5px solid var(--color-danger-border);
- background:var(--color-danger-soft);color:var(--color-danger);font-size:18px;cursor:pointer}
+ background:var(--color-danger-soft);color:var(--color-danger);cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0}
+.thumb.ph{color:var(--text-secondary)}
 .mmain{position:relative;display:flex;align-items:center;gap:10px;padding:8px;background:var(--color-card-bg);
  border-radius:14px;transition:transform .18s;touch-action:pan-y;user-select:none}
 .thumb{width:48px;height:48px;border-radius:12px;object-fit:cover;flex:none;background:var(--bar-track)}
@@ -609,6 +610,9 @@ input[type=text]:focus{border-color:var(--color-primary)}
  border-left:3px solid var(--color-danger);color:var(--color-danger);font-size:12.5px;border-radius:6px;word-break:break-all}
 .fixerr.show{display:block}
 button{transition:transform .12s;font-family:var(--font-family)}
+@media (prefers-reduced-motion:reduce){
+ *,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}
+}
 .btnrow button:active,.pills button:active,.seg button:active,.save:active,.ebtns button:active,
  #avSave:active,#avFix:active,.gear:active,.delzone2:active{transform:scale(.95)}
 #av,.mback{-webkit-overflow-scrolling:touch}
@@ -642,7 +646,7 @@ button{transition:transform .12s;font-family:var(--font-family)}
   <div class="mhead"><b>编辑食物</b><button id="eClose">✕</button></div>
   <div class="ehead">
    <img id="eThumb" class="ethumb" alt="" style="display:none">
-   <div class="ethumb ph" id="eThumbPh">🍳</div>
+   <div class="ethumb ph" id="eThumbPh" role="img" aria-label="暂无照片"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M4 13h16"/><path d="M5 13a7 7 0 0 0 14 0z"/><path d="M9 13V9h6v4"/></svg></div>
    <div class="ehint">点头像可更换这张照片</div>
    <input type="file" id="ePhoto" accept="image/*" style="display:none">
   </div>
@@ -788,9 +792,13 @@ async function refresh(){
     "<div class='gsug'>热量建议："+sug(g.m)+" kcal</div>";
    for(const r of g.items){
     h+="<div class='mrow' data-id='"+r.id+"'>"+
-     "<div class='dz'><button class='delzone2' data-del='"+r.id+"' title='删除'>🗑</button></div>"+
+     "<div class='dz'><button class='delzone2' data-del='"+r.id+"' aria-label='删除"+esc(r.food)+"'>"+
+     "<svg width='20' height='20' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' aria-hidden='true'>"+
+     "<path d='M3 6h18'/><path d='M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2'/>"+
+     "<path d='M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6'/><path d='M10 11v6M14 11v6'/></svg></button></div>"+
      "<div class='mmain'>"+
-     (r.photo?"<img class='thumb' src='/photo/"+r.id+"' alt=''>":"<div class='thumb ph'>🍳</div>")+
+     (r.photo?"<img class='thumb' src='/photo/"+r.id+"' alt=''>":"<div class='thumb ph' role='img' aria-label='暂无照片'>" +
+     "<svg width='26' height='26' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='1.6' stroke-linecap='round' aria-hidden='true'><path d='M4 13h16'/><path d='M5 13a7 7 0 0 0 14 0z'/></svg></div>")+
      "<div class='mname'>"+esc(r.food)+"<div class='msub'>"+
      [r.portion,r.note].filter(Boolean).map(esc).join(" · ")+"</div></div>"+
      "<div class='kcell'><b>"+r.kcal+"</b> 千卡<span class='chev'>›</span></div></div></div>";
