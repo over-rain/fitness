@@ -13,3 +13,4 @@ __pycache__/
 *.pyc
 .venv/
 pc.html
+pc.js
