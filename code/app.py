@@ -445,6 +445,7 @@ body{font-family:var(--font-family);margin:0;color:var(--text-main)}
 /* ===== 首页：剩余卡 ===== */
 .num{font-size:var(--font-size-big-number);font-weight:var(--font-weight-bold);letter-spacing:-.5px;
  margin:2px 0 10px;color:var(--text-main)}
+.num.over{color:var(--color-danger)}
 .num small{font-size:var(--font-size-small);color:var(--text-secondary);font-weight:400;margin-left:3px}
 .bar{height:9px;background:var(--bar-track);border-radius:99px;overflow:hidden}
 .bar i{display:block;height:100%;width:0;border-radius:99px;background:var(--progress-bar);transition:width .5s}
@@ -812,10 +813,12 @@ const MEAL_ORD={"早餐":0,"午餐":1,"晚餐":2,"加餐":3};
 async function refresh(){
  try{const j=await api("/api/today?user="+user);
   $("remain").textContent=j.remaining;
+  $("remain").classList.toggle("over",j.remaining<0);
   const pct=Math.min(100,j.target?j.eaten/j.target*100:0);
   const bar=$("bar");bar.classList.toggle("warn",pct>85);
   bar.firstElementChild.style.width=pct+"%";
-  $("sumline").textContent="已吃 "+j.eaten+" / "+j.target+" kcal ｜ 蛋白 "+j.protein+" / "+j.protein_target+" g";
+  $("sumline").textContent=(j.remaining<0?"⚠️ 已超出 "+(-j.remaining)+" 千卡 ｜ ":"")
+   +"已吃 "+j.eaten+" / "+j.target+" kcal ｜ 蛋白 "+j.protein+" / "+j.protein_target+" g";
   const d=$("dinner");d.textContent=j.dinner_tip?("🌙 "+j.dinner_tip):"";d.classList.toggle("show",!!j.dinner_tip);
   _recs={};j.records.forEach(r=>_recs[r.id]=r);
   const RAT={"早餐":0.25,"午餐":0.35,"晚餐":0.30,"加餐":0.10};
