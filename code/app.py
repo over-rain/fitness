@@ -380,6 +380,7 @@ INDEX = r"""<!doctype html><html lang="zh"><head>
  --font-weight-bold:700;--font-weight-normal:400;
  --color-danger:#E03131;--color-danger-soft:#FFF1F1;--color-danger-border:#FFC9C9;
  --color-warn:#F59E0B;--toast-bg:#111827;
+ --color-solid:#FFFFFF;
 }
 /* ===== ② 主题语义变量（视图容器挂 data-theme）===== */
 [data-theme="home"]{
@@ -454,8 +455,9 @@ body{font-family:var(--font-family);margin:0;color:var(--text-main)}
 @keyframes bump{30%{transform:scale(1.1);color:var(--color-primary)}}
 .num.bump{animation:bump .5s}
 /* ===== 首页：输入卡 ===== */
-input[type=text]{width:100%;border:1.5px solid var(--color-card-border);border-radius:12px;padding:12px 13px;
- font-size:15px;outline:none;background:var(--color-card-bg);color:var(--text-main)}
+input[type=text]{width:100%;border:1.5px solid var(--color-divider);border-radius:12px;padding:12px 13px;
+ font-size:15px;outline:none;background:var(--color-solid);color:var(--text-main);
+ box-shadow:0 1px 4px var(--shadow-card-2)}
 input[type=text]:focus{border-color:var(--color-primary)}
 .btnrow{display:flex;gap:9px;margin-top:11px}
 .btnrow button{flex:1;border:0;border-radius:var(--radius-btn);padding:13px;font-size:var(--font-size-body);
@@ -464,9 +466,9 @@ input[type=text]:focus{border-color:var(--color-primary)}
 .photo{background:var(--color-primary)}
 .btnrow .send{background:var(--color-card-bg);border:1.5px solid var(--color-primary);color:var(--color-primary)}
 #reply{margin-top:11px;border-radius:12px;padding:12px 13px;font-size:13.5px;line-height:1.75;white-space:pre-wrap;display:none}
-#reply.ok{display:block;background:var(--color-card-bg);border-left:3px solid var(--color-primary)}
+#reply.ok{display:block;background:var(--color-solid);border-left:3px solid var(--color-primary)}
 #reply.err{display:block;background:var(--color-danger-soft);border-left:3px solid var(--color-danger);color:var(--color-danger)}
-#reply.wait{display:block;background:var(--color-card-bg);border-left:3px solid var(--color-divider);color:var(--text-secondary)}
+#reply.wait{display:block;background:var(--color-solid);border-left:3px solid var(--color-divider);color:var(--text-secondary)}
 .spin{display:inline-block;width:13px;height:13px;border:2px solid var(--color-divider);
  border-top-color:var(--color-primary);border-radius:50%;vertical-align:-2px;margin-right:8px;animation:sp .8s linear infinite}
 @keyframes sp{to{transform:rotate(360deg)}}
@@ -512,8 +514,8 @@ input[type=text]:focus{border-color:var(--color-primary)}
 .avbar>button{border:1px solid var(--color-card-border);background:var(--color-card-bg);
  border-radius:var(--radius-btn);font-size:14px;color:var(--text-main);
  box-shadow:0 1px 4px var(--shadow-card-2)}
-#avBack{width:38px;height:38px;font-weight:700}
-#avMeal{padding:10px 18px;font-size:14px}
+#avBack{width:38px;height:38px;font-weight:700;font-size:16px}
+#avMeal{padding:10px 20px;font-size:15px;font-weight:700}
 #avmenu{position:fixed;top:56px;left:50%;transform:translateX(-50%);background:var(--color-card-bg);
  border:1px solid var(--color-card-border);box-shadow:var(--shadow-card);display:none;z-index:60;overflow:hidden}
 #avmenu button{display:block;width:100%;border:0;background:none;padding:11px 30px;
@@ -586,8 +588,8 @@ input[type=text]:focus{border-color:var(--color-primary)}
 .ethumb.ph{display:flex;align-items:center;justify-content:center;font-size:22px}
 .ehint{font-size:11.5px;color:var(--text-secondary)}
 .elabel{font-size:12.5px;color:var(--text-secondary);margin:9px 2px 5px}
-.einput{width:100%;box-sizing:border-box;border:1.5px solid var(--color-card-border);border-radius:12px;
- padding:11px 12px;font-size:14.5px;outline:none;background:var(--color-card-bg);color:var(--text-main)}
+.einput{width:100%;box-sizing:border-box;border:1.5px solid var(--color-divider);border-radius:12px;
+ padding:11px 12px;font-size:14.5px;outline:none;background:var(--color-solid);color:var(--text-main)}
 .einput:focus{border-color:var(--color-primary)}
 .pills{display:flex;gap:8px;flex-wrap:wrap}
 .pills button{padding:8px 16px;border-radius:var(--radius-tag);border:1.5px solid var(--color-card-border);
@@ -605,7 +607,7 @@ input[type=text]:focus{border-color:var(--color-primary)}
 #fixPhotoBtn{border:1.5px solid var(--color-card-border);background:var(--color-card-bg);
  border-radius:10px;padding:8px 10px;font-size:13px;color:var(--text-main)}
 #fixThumb{width:42px;height:42px;border-radius:8px;object-fit:cover}
-#fixText{width:100%;height:110px;border:1.5px solid var(--color-card-border);border-radius:12px;padding:12px;
+#fixText{width:100%;height:110px;border:1.5px solid var(--color-divider);border-radius:12px;padding:12px;
  font-size:14px;resize:vertical;background:var(--color-card-bg);outline:none;box-sizing:border-box;color:var(--text-main)}
 #fixText:focus{border-color:var(--color-primary)}
 .fixcnt{text-align:right;font-size:12px;color:var(--text-secondary);margin-top:4px}
@@ -626,6 +628,7 @@ button{transition:transform .12s;font-family:var(--font-family)}
  <div style="display:flex;gap:6px;align-items:center">
   <div class="seg"><button id="u1"></button><button id="u2"></button></div>
   <button class="gear" id="gear" title="身体档案设置">⚙️</button>
+  <button class="gear" id="themeBtn" title="切换全局主题">🧊</button>
  </div></div>
 <div class="card">
  <div class="muted">今日剩余</div>
@@ -736,6 +739,10 @@ function clearReply(){const el=$("reply");el.className="";el.textContent="";}
 function showBack(id){const el=$(id);el.style.display="flex";el.classList.remove("closing");}
 function hideBack(id){const el=$(id);el.classList.add("closing");
  setTimeout(()=>{el.style.display="none";el.classList.remove("closing");},240);}
+function applyTheme(t){document.querySelectorAll("[data-theme]").forEach(v=>v.setAttribute("data-theme",t));
+ $("themeBtn").textContent=t==="meal"?"🌿":"🧊";localStorage.setItem("fg_theme",t);}
+$("themeBtn").onclick=()=>applyTheme(localStorage.getItem("fg_theme")==="meal"?"home":"meal");
+applyTheme(localStorage.getItem("fg_theme")||"home");
 function openSettings(){showBack("mback");loadProfile();
  api("/api/mockcfg").then(j=>{$("mockChk").checked=!!j.mock;}).catch(()=>{});}
 $("mockChk").onchange=async e=>{const on=e.target.checked;

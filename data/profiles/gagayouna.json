@@ -14,7 +14,7 @@
     "fat_g": 43,
     "carb_g": 156,
     "calculated_by": "fitness_lib.py Mifflin-St Jeor",
-    "calculated_at": "2026-10-16"
+    "calculated_at": "2026-10-20"
   },
   "notes": "周练3天为假设值；BMI 21.4 正常区间，3.5kg 为温和目标；每日摄入不应低于 1200 kcal"
 }
