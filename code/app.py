@@ -22,7 +22,7 @@ import socket
 import sqlite3
 import sys
 import urllib.request
-from datetime import datetime
+from datetime import datetime, timedelta
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import urlparse, parse_qs
 
@@ -61,6 +61,9 @@ ANALYZE_PROMPT = (
     "忽略闲聊和无法确定是否入口的内容；【今日已有记录】里已存在的同餐次同食物不要重复输出。"
     "⑥ 「晚上还有八只虾」「热一下」「煮熟了」「不热了直接吃」这类描述 = 现在就吃这些剩菜，"
     "正常提取为当前餐次的记录，不要因为是对话形式而跳过。"
+    "⑦ 用户描述训练/运动（如练了胸、骑车40分钟、深蹲4组12个）→ action=training，"
+    "items 填 {\"action\":\"动作名\",\"sets_reps\":\"组次\",\"duration_min\":分钟,"
+    "\"kcal\":预计消耗中值,\"kcal_low\":低,\"kcal_high\":高}（按动作类型和时长估消耗，力量训练约20分钟150~250千卡）。"
 )
 
 # ---------------------------------------------------------------- 配置
@@ -109,6 +112,11 @@ def db():
 
 
 def init_db():
+    # 部署(FaaS)环境可能没有 data 目录——建库前先确保目录存在（部署适配，勿删）
+    os.makedirs(DATA, exist_ok=True)
+    os.makedirs(PROFILES_DIR, exist_ok=True)
+    os.makedirs(os.path.join(DATA, "meals"), exist_ok=True)
+    os.makedirs(os.path.join(DATA, "plans"), exist_ok=True)
     with db() as conn:
         conn.execute(
             """CREATE TABLE IF NOT EXISTS meals (
@@ -119,6 +127,19 @@ def init_db():
                 food TEXT NOT NULL,
                 kcal INTEGER, kcal_low INTEGER, kcal_high INTEGER,
                 protein_g INTEGER,
+                note TEXT DEFAULT '',
+                created_at TEXT
+            )"""
+        )
+        conn.execute(
+            """CREATE TABLE IF NOT EXISTS workouts (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id TEXT NOT NULL,
+                date TEXT NOT NULL,
+                action TEXT NOT NULL,
+                sets_reps TEXT DEFAULT '',
+                duration_min INTEGER,
+                est_kcal INTEGER,
                 note TEXT DEFAULT '',
                 created_at TEXT
             )"""
@@ -436,11 +457,12 @@ body{font-family:var(--font-family);margin:0;color:var(--text-main)}
 .text-small{font-size:var(--font-size-small);color:var(--text-secondary)}
 .muted{color:var(--text-secondary);font-size:var(--font-size-small)}
 /* ===== 首页头部 ===== */
-.hd{display:flex;align-items:center;justify-content:space-between;margin:2px 2px 12px}
-.hd h1{font-size:var(--font-size-heading);margin:0;color:var(--text-main)}
+.hd{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px;
+ margin:2px 2px 12px}
+.hd h1{font-size:var(--font-size-heading);margin:0;color:var(--text-main);white-space:nowrap}
 .seg{display:flex;gap:6px}
-.seg button{padding:7px 12px;border:1px solid var(--color-card-border);background:var(--color-card-bg);
- border-radius:var(--radius-tag);font-size:13px;color:var(--text-secondary)}
+.seg button{padding:6px 10px;border:1px solid var(--color-card-border);background:var(--color-card-bg);
+ border-radius:var(--radius-tag);font-size:12px;color:var(--text-secondary);white-space:nowrap}
 .seg button.on{background:var(--color-primary);border-color:var(--color-primary);color:#fff;font-weight:600}
 .gear{border:1px solid var(--color-card-border);background:var(--color-card-bg);
  border-radius:var(--radius-tag);padding:7px 10px;font-size:14px;color:var(--text-main)}
@@ -656,7 +678,7 @@ button{transition:transform .12s;font-family:var(--font-family)}
  <div class="btnrow">
   <button class="photo" id="bPhoto">📷 拍照记录</button>
   <button class="send" id="bSend">发送</button></div>
- <input type="file" id="photo" accept="image/*" capture="environment" style="display:none">
+ <input type="file" id="photo" accept="image/*" style="display:none">
  <div id="reply"></div></div>
 <div class="card"><div style="display:flex;align-items:center;margin-bottom:6px">
  <div class="muted" style="flex:1">今日明细</div>
