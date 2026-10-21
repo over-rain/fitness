@@ -695,7 +695,7 @@ button{transition:transform .12s;font-family:var(--font-family)}
   </div>
   <div class="elabel">食物名称</div>
   <input class="einput" id="eFood">
-  <div class="elabel">食用克重（如 120g，可留空）</div>
+  <div class="elabel">食用克重（改这里，热量/蛋白自动按比例更新）</div>
   <input class="einput" id="ePortion">
   <div class="elabel">热量 kcal</div>
   <input class="einput" id="eKcal" type="number">
@@ -1116,11 +1116,24 @@ function openEdit(id){
  else{$("eThumb").style.display="none";$("eThumbPh").style.display="flex";}
  $("eFood").value=r.food;$("ePortion").value=r.portion||"";
  $("eKcal").value=r.kcal;$("eProtein").value=(r.protein_g==null?"":r.protein_g);
+ editBase={kcal:r.kcal||0,per:pnum(r.portion),prot:(r.protein_g==null?null:r.protein_g)};
+ kcalTouched=false;protTouched=false;
  $("ePills").innerHTML=MEALS.map(m=>"<button data-m='"+m+"' class='"+(m===r.meal_type?"on":"")+"'>"+m+"</button>").join("");
  $("ePills").querySelectorAll("button").forEach(b=>b.onclick=()=>{
   $("ePills").querySelectorAll("button").forEach(x=>x.classList.remove("on"));b.classList.add("on");});
  showBack("editBack");requestAnimationFrame(()=>$("editBack").classList.add("open"));
 }
+function pnum(s){const m=String(s||"").match(/(\d+(?:\.\d+)?)/);return m?parseFloat(m[1]):null;}
+let editBase={kcal:0,per:null,prot:null},kcalTouched=false,protTouched=false;
+$("ePortion").addEventListener("input",()=>{
+ if(kcalTouched&&protTouched)return;
+ const nNew=pnum($("ePortion").value),nOld=editBase.per;
+ if(!nOld||!nNew||nNew<=0)return;
+ if(!kcalTouched&&editBase.kcal>0)$("eKcal").value=Math.round(editBase.kcal*nNew/nOld);
+ if(!protTouched&&editBase.prot!=null)$("eProtein").value=Math.round(editBase.prot*nNew/nOld);
+});
+$("eKcal").addEventListener("input",()=>{kcalTouched=true;});
+$("eProtein").addEventListener("input",()=>{protTouched=true;});
 function closeEdit(){$("editBack").classList.remove("open");hideBack("editBack");}
 $("editBack").onclick=e=>{if(!e.target.closest(".sheet"))closeEdit();};
 $("eClose").onclick=closeEdit;$("eCancel").onclick=closeEdit;
