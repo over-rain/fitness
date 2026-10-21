@@ -777,7 +777,9 @@ function paintSeg(){$("u1").classList.toggle("on",user==="beifeng");$("u2").clas
 $("u1").textContent="🧑 邶风";$("u2").textContent="👩 gagayouna";
 $("u1").onclick=()=>{user="beifeng";localStorage.setItem("fg_user",user);paintSeg();clearReply();refresh();if($("mback").style.display==="flex")loadProfile();};
 $("u2").onclick=()=>{user="gagayouna";localStorage.setItem("fg_user",user);paintSeg();clearReply();refresh();if($("mback").style.display==="flex")loadProfile();};
-function clearReply(){const el=$("reply");el.className="";el.textContent="";}
+function clearReply(){const el=$("reply");el.className="";el.textContent="";
+ if(timer)clearInterval(timer);timer=null;suppress=true;busy=false;
+ $("bPhoto").disabled=false;$("bSend").disabled=false;}
 function showBack(id){const el=$(id);el.style.display="flex";el.classList.remove("closing");}
 function hideBack(id){const el=$(id);el.classList.add("closing");
  setTimeout(()=>{el.style.display="none";el.classList.remove("closing");},240);}
@@ -837,15 +839,17 @@ async function api(path,opts,tmo){const ctl=("AbortController"in window)?new Abo
    if(c){TOKEN=c;localStorage.setItem("fg_token",c);throw new Error("访问码已记录，请重试刚才的操作");}}
   if(!r.ok)throw new Error((j&&j.error)||("HTTP "+r.status));return j;}
  finally{if(to)clearTimeout(to);}}
-let busy=false,timer=null;
+let busy=false,timer=null,suppress=false;
 function setLoading(msg){busy=true;$("bPhoto").disabled=true;$("bSend").disabled=true;
+ suppress=false;
  const el=$("reply"),t0=Date.now();el.className="wait";
  el.innerHTML="<span class='spin'></span>"+msg+" <b id='el'></b>";
- timer=setInterval(()=>{const s=Math.round((Date.now()-t0)/1000);
-  $("el").textContent=s+"s"+(s>12?" · 大图高峰会慢些":"");},500);}
+ timer=setInterval(()=>{const el=$("el");if(!el){if(timer)clearInterval(timer);return;}
+  const s=Math.round((Date.now()-t0)/1000);
+  el.textContent=s+"s"+(s>12?" · 大图高峰会慢些":"");},500);}
 function done(){busy=false;$("bPhoto").disabled=false;$("bSend").disabled=false;if(timer)clearInterval(timer);}
-function showOk(t){done();const el=$("reply");el.className="ok";el.textContent=t;}
-function showErr(t){done();const el=$("reply");el.className="err";el.textContent="❌ "+t;}
+function showOk(t){done();if(suppress)return;const el=$("reply");el.className="ok";el.textContent=t;}
+function showErr(t){done();if(suppress)return;const el=$("reply");el.className="err";el.textContent="❌ "+t;}
 function toast(t){const el=$("toast");el.textContent=t;el.classList.add("show");
  setTimeout(()=>el.classList.remove("show"),2200);}
 const MEAL_ORD={"早餐":0,"午餐":1,"晚餐":2,"加餐":3};
@@ -1045,8 +1049,9 @@ $("avFix").onclick=()=>{if(avBusy||!avB64)return;
  $("fixThumb").style.display="none";$("fixPhotoHint").textContent="可选：拍剩余的盘子，AI 按图扣减";
  $("fixErr").classList.remove("show");
  showBack("fixBack");$("fixText").focus();};
-$("fixClose").onclick=()=>hideBack("fixBack");
-$("fixBack").onclick=e=>{if(e.target.id==="fixBack")hideBack("fixBack");};
+$("fixClose").onclick=()=>{if(avBusy){toast("AI 正在分析，请稍候…");return;}hideBack("fixBack");};
+$("fixBack").onclick=e=>{if(e.target.id!=="fixBack")return;
+ if(avBusy){toast("AI 正在分析，请稍候…");return;}hideBack("fixBack");};
 $("fixText").addEventListener("input",e=>{$("fixCnt").textContent=e.target.value.length+"/200";});
 $("fixPhotoBtn").onclick=()=>$("fixPhoto").click();
 $("fixPhoto").addEventListener("change",async e=>{
