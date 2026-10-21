@@ -1482,7 +1482,7 @@ def all_ips():
 
 def main():
     init_db()
-    port = int(CFG.get("port", 8124))
+    port = int(os.environ.get("PORT") or CFG.get("port", 8124))
     try:
         server = ThreadingHTTPServer(("0.0.0.0", port), H)
     except OSError as ex:
