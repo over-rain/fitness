@@ -20,6 +20,7 @@ import os
 import re
 import socket
 import sqlite3
+import subprocess
 import sys
 import urllib.request
 from datetime import datetime, timedelta
@@ -1243,6 +1244,14 @@ class H(BaseHTTPRequestHandler):
             self._send(200, "text/html; charset=utf-8", INDEX.encode("utf-8"))
         elif p == "/api/health":
             self._json(200, {"ok": True, "mock": CFG.get("mock", False)})
+        elif p == "/deploy":
+            tok = CFG.get("access_code") or ""
+            q = parse_qs(urlparse(self.path).query)
+            supplied = (q.get("token") or [""])[0]
+            if not tok or not hmac.compare_digest(supplied, tok):
+                return self._json(401, {"error": "token 不匹配"})
+            self._trigger_deploy()
+            self._json(200, {"ok": True, "msg": "部署已触发，约 10 秒后生效"})
         elif p == "/api/mockcfg":
             self._json(200, {"mock": bool(CFG.get("mock", False))})
         elif p.startswith("/photo/"):
@@ -1279,7 +1288,7 @@ class H(BaseHTTPRequestHandler):
 
     def do_POST(self):
         p = urlparse(self.path).path
-        if p not in ("/api/meal", "/api/correct", "/api/profile", "/api/analyze", "/api/save", "/api/clear", "/api/mockcfg"):
+        if p not in ("/api/meal", "/api/correct", "/api/profile", "/api/analyze", "/api/save", "/api/clear", "/api/mockcfg", "/deploy"):
             return self._send(404, "text/plain", b"not found")
         if not self._authed():
             return self._json(401, {"error": "需要访问码"})
@@ -1304,6 +1313,13 @@ class H(BaseHTTPRequestHandler):
                 with open(CFG_PATH, "w", encoding="utf-8") as f:
                     json.dump(CFG, f, ensure_ascii=False, indent=2)
                 self._json(200, {"ok": True, "mock": CFG["mock"]})
+            if p == "/deploy":
+                tok = CFG.get("access_code") or ""
+                supplied = self.headers.get("X-Gitee-Token") or self.headers.get("X-Access-Token") or ""
+                if not tok or not hmac.compare_digest(supplied, tok):
+                    return self._json(401, {"error": "token 不匹配"})
+                self._trigger_deploy()
+                self._json(200, {"ok": True, "msg": "部署已触发"})
         except ApiError as ex:
             self._json(400, {"error": str(ex)})
         except Exception as ex:
@@ -1414,6 +1430,13 @@ class H(BaseHTTPRequestHandler):
         with open(path, "w", encoding="utf-8") as f:
             json.dump(p, f, ensure_ascii=False, indent=2)
         self._json(200, {"ok": True, "targets": p["targets"]})
+
+    def _trigger_deploy(self):
+        """分离执行：git pull + 重启服务（先返回响应，1 秒后执行）。
+        重启会终止本进程——由 systemd 自动拉起，属预期行为。"""
+        cmd = ("sleep 1; cd /opt/fitness && git pull >> /opt/fitness/data/deploy.log 2>&1"
+               " && systemctl restart fitness >> /opt/fitness/data/deploy.log 2>&1")
+        subprocess.Popen(["bash", "-c", cmd], start_new_session=True)
 
     def _handle_meal(self, body: bytes):
         ctype = self.headers.get("Content-Type", "")
