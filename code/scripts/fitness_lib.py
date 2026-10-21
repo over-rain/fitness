@@ -16,12 +16,15 @@ ACTIVITY = {  # Excel: 周训练天数 -> 活动系数（约）
 GOAL_DELTA = {"fat_loss": -350, "bulk": 250, "maintain": 0}
 
 
-def plan(height_cm, weight_kg, age, gender, goal="fat_loss", training_days=4):
+def plan(height_cm, weight_kg, age, gender, goal="fat_loss", training_days=4, deficit=None):
     total = weight_kg * 10 + height_cm * 6.25 - 5 * age + (5 if gender in ("male", "男") else -161)
     b = total
     a = ACTIVITY.get(int(training_days), 1.35)
     tdee = round(b * a)
-    goal_kcal = tdee + GOAL_DELTA.get(goal, 0)
+    if deficit is not None:
+        goal_kcal = tdee - int(deficit)
+    else:
+        goal_kcal = tdee + GOAL_DELTA.get(goal, 0)
     protein_g = round(weight_kg * (1.6 if goal == "fat_loss" else 1.8))
     fat_g = round(weight_kg * 0.8)
     # 减脂期蛋白占比高，其余给碳水

@@ -386,6 +386,7 @@ INDEX = r"""<!doctype html><html lang="zh"><head>
 /* ===== ② 主题语义变量（视图容器挂 data-theme）===== */
 [data-theme="home"]{
  --color-page-bg:#E6F6E9;
+ --color-page-bg-gradient:linear-gradient(180deg,#C9E9D2 0%,#E6F6E9 55%,#D8EEDD 100%);
  --color-card-bg:rgba(255,255,255,0.72);
  --color-card-border:rgba(255,255,255,0.85);
  --color-primary:#57C374;
@@ -399,6 +400,7 @@ INDEX = r"""<!doctype html><html lang="zh"><head>
 }
 [data-theme="meal"]{
  --color-page-bg:#E8F2FC;
+ --color-page-bg-gradient:linear-gradient(180deg,#BFDBF7 0%,#E8F2FC 55%,#D6E7F8 100%);
  --color-card-bg:rgba(255,255,255,0.72);
  --color-card-border:rgba(255,255,255,0.85);
  --color-primary:#3B88ED;
@@ -413,7 +415,7 @@ INDEX = r"""<!doctype html><html lang="zh"><head>
 /* ===== 基础 ===== */
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 body{font-family:var(--font-family);margin:0;color:var(--text-main)}
-.view{min-height:100vh;background:var(--color-page-bg);color:var(--text-main)}
+.view{min-height:100vh;background:var(--color-page-bg-gradient,var(--color-page-bg));color:var(--text-main)}
 #homeView{max-width:430px;margin:0 auto;padding:14px 12px 30px}
 #homeView .card{margin-bottom:var(--gap-card)}
 #homeView .card:last-child{margin-bottom:0}
@@ -509,11 +511,11 @@ input[type=text]:focus{border-color:var(--color-primary)}
 #toast.show{opacity:.92}
 /* ===== 餐详情（meal 视图）===== */
 #av{display:none;position:fixed;top:0;bottom:0;left:0;right:0;margin:0 auto;max-width:430px;
- background:var(--color-page-bg);z-index:40;overflow-y:auto;padding-bottom:86px;
+ background:var(--color-page-bg-gradient,var(--color-page-bg));z-index:40;overflow-y:auto;padding-bottom:86px;
  border-left:1px solid var(--color-card-border);border-right:1px solid var(--color-card-border);
  -webkit-overflow-scrolling:touch;animation:fadeIn .2s}
 .avbar{position:sticky;top:0;display:flex;align-items:center;justify-content:space-between;
- padding:12px 14px;background:var(--color-page-bg);z-index:5}
+ padding:12px 14px;background:transparent;z-index:5}
 .avbar>button{border:1px solid var(--color-card-border);background:var(--color-card-bg);
  border-radius:var(--radius-btn);font-size:14px;color:var(--text-main);
  box-shadow:0 1px 4px var(--shadow-card-2)}
@@ -537,6 +539,14 @@ input[type=text]:focus{border-color:var(--color-primary)}
 .mc-n{font-size:10.5px;color:var(--text-secondary);margin-top:8px;padding-top:7px;
  border-top:1px solid var(--color-divider);white-space:nowrap;overflow:hidden}
 .mc-n b{color:var(--text-main);font-size:12.5px}
+.svals{display:flex;justify-content:space-between;font-size:10.5px;color:var(--text-secondary);margin-top:4px}
+.calcbox{margin-top:10px;padding:9px 11px;background:var(--color-solid);border-radius:10px;
+ border:1px solid var(--color-divider);font-size:12px;color:var(--text-secondary)}
+.calcbox .crow{display:flex;justify-content:space-between;padding:2px 0}
+.calcbox .caltotal{margin-top:4px;padding-top:5px;border-top:1px dashed var(--color-divider);
+ color:var(--text-main);font-size:12.5px}
+.calcbox .caltotal b{color:var(--color-primary)}
+.warnred{color:var(--color-danger);font-weight:600}
 .ring-track{stroke:var(--ring-bg)}
 .ring-fill{stroke:var(--ring-progress)}
 #avKcal{padding:16px 20px}
@@ -694,6 +704,11 @@ button{transition:transform .12s;font-family:var(--font-family)}
     <div><label>目标体重 kg</label><input type="number" step="0.1" id="s_targetw"></div>
     <div><label>周练天数</label><input type="number" min="0" max="7" id="s_days"></div>
    </div>
+   <div class="elabel" style="margin-top:12px">减脂缺口（每天少吃的量）</div>
+   <div class="num" style="font-size:26px;margin:0 0 6px"><span id="s_defval">350</span><small> kcal</small></div>
+   <input type="range" id="s_deficit" min="0" max="750" step="25" value="350" style="width:100%;accent-color:var(--color-primary)">
+   <div class="svals"><span>0 维持</span><span>温和 350</span><span>标准 500</span><span>激进 750</span></div>
+   <div class="calcbox" id="calcBox"></div>
    <button class="save" id="s_save">💾 保存并重算</button>
    <div class="muted" id="s_hint" style="margin-top:9px"></div>
   </div>
@@ -769,6 +784,8 @@ async function loadProfile(){
   $("s_age").value=p.age??"";$("s_height").value=p.height_cm??"";
   $("s_weight").value=p.weight_kg??"";$("s_targetw").value=p.target_weight_kg??"";
   $("s_days").value=p.training_days??4;
+  $("s_deficit").value=p.deficit??350;
+  updateCalc();
   const t=p.targets||{};
   $("s_hint").textContent="当前热量线 "+(t.daily_kcal??"?")+" kcal / 蛋白 "+(t.protein_g??"?")+"g（"+(t.calculated_at||"")+" 算）";
  }catch(e){toast("读取档案失败："+e.message);}
@@ -777,7 +794,7 @@ $("s_save").onclick=async()=>{
  try{const j=await api("/api/profile",{method:"POST",headers:{"Content-Type":"application/json"},
   body:JSON.stringify({user:user,display_name:$("s_name").value,gender:$("s_gender").value,
    age:$("s_age").value,height_cm:$("s_height").value,weight_kg:$("s_weight").value,
-   target_weight_kg:$("s_targetw").value,training_days:$("s_days").value})});
+   target_weight_kg:$("s_targetw").value,training_days:$("s_days").value,deficit:$("s_deficit").value})});
   const btn=user==="beifeng"?$("u1"):$("u2");
   btn.textContent=(user==="beifeng"?"🧑 ":"👩 ")+($("s_name").value.trim()||user);
   toast("已保存，热量线 "+j.targets.daily_kcal+" kcal / 蛋白 "+j.targets.protein_g+"g");
@@ -1124,6 +1141,32 @@ $("cOk").onclick=async()=>{
  clearing=false;
 };
 function bump(){const el=$("remain");el.classList.remove("bump");void el.offsetWidth;el.classList.add("bump");}
+// ---- 减脂缺口滑块：实时计算明细 ----
+function updateCalc(){
+ const w=parseFloat($("s_weight").value),h=parseFloat($("s_height").value),a=parseFloat($("s_age").value);
+ const g=$("s_gender").value,d=parseInt($("s_days").value)||0;
+ $("s_defval").textContent=$("s_deficit").value;
+ if(!(w>0&&h>0&&a>0)){$("calcBox").innerHTML="<span class='muted'>填完身高/体重/年龄后显示计算明细</span>";return;}
+ const bmr=Math.round(10*w+6.25*h-5*a+(g==="male"?5:-161));
+ const af={0:1.2,1:1.26,2:1.32,3:1.38,4:1.44,5:1.5,6:1.56,7:1.6}[d]||1.35;
+ const tdee=Math.round(bmr*af);
+ const deficit=parseInt($("s_deficit").value)||0;
+ const target=tdee-deficit;
+ const floor=g==="male"?1500:1200;
+ $("s_deficit").max=Math.max(0,Math.min(750,tdee-floor));
+ const row=(l,v)=>"<div class='crow'><span>"+l+"</span><span>"+v+"</span></div>";
+ let t=row("基础代谢",Math.round(bmr)+" 千卡")
+       +row("不减肥该吃（×"+af+" 活动系数）",tdee+" 千卡")
+       +row("减脂缺口","−"+deficit+" 千卡");
+ let tot="目标摄入 <b>"+target+"</b> 千卡";
+ if(target<floor){tot+=" <span class='warnred'>⚠️ 低于安全下限 "+floor+"</span>";}
+ else if(deficit>0){tot+="<span class='muted'> ｜ 预计每周 −"+(deficit*7/7700).toFixed(2)+" kg</span>";}
+ t+="<div class='caltotal'>"+tot+"</div>";
+ $("calcBox").innerHTML=t;
+}
+["s_weight","s_height","s_age","s_days"].forEach(id=>$(id).addEventListener("input",updateCalc));
+$("s_gender").addEventListener("change",updateCalc);
+$("s_deficit").addEventListener("input",updateCalc);
 // 点空白处收起滑开的删除区
 document.addEventListener("click",e=>{
  if(openId!==null&&!e.target.closest("#list")&&!e.target.closest(".mback")&&!e.target.closest(".modal")){
@@ -1317,11 +1360,13 @@ class H(BaseHTTPRequestHandler):
                      ("height_cm", num_field(j, "height_cm", 100, 250)),
                      ("weight_kg", num_field(j, "weight_kg", 30, 250)),
                      ("target_weight_kg", num_field(j, "target_weight_kg", 30, 250)),
-                     ("training_days", num_field(j, "training_days", 0, 7, True))):
+                     ("training_days", num_field(j, "training_days", 0, 7, True)),
+                     ("deficit", num_field(j, "deficit", 0, 750))):
             if v is not None:
                 p[k] = v
         res = calc_plan(p["height_cm"], p["weight_kg"], p["age"], p["gender"],
-                        p.get("goal", "fat_loss"), p.get("training_days", 4))
+                        p.get("goal", "fat_loss"), p.get("training_days", 4),
+                        deficit=p.get("deficit"))
         p["targets"] = {"daily_kcal": res["target_kcal"], "protein_g": res["protein_g"],
                         "fat_g": res["fat_g"], "carb_g": res["carb_g"],
                         "calculated_by": "fitness_lib.py Mifflin-St Jeor",
