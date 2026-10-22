@@ -387,8 +387,8 @@ def insert_meals(user_id, items):
     return ids
 
 
-def today_summary(user_id):
-    date = datetime.now().strftime("%Y-%m-%d")
+def today_summary(user_id, date_str=None):
+    date = date_str if (date_str and re.match(r"^\d{4}-\d{2}-\d{2}$", date_str)) else datetime.now().strftime("%Y-%m-%d")
     tgt = profile_targets(user_id)
     with db() as conn:
         rows = [dict(r) for r in conn.execute(
@@ -627,6 +627,32 @@ input[type=text]:focus{border-color:var(--color-primary)}
  color:var(--text-main);font-size:12.5px}
 .calcbox .caltotal b{color:var(--color-primary)}
 .warnred{color:var(--color-danger);font-weight:600}
+.dchead{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+.navb{border:1px solid var(--color-card-border);background:var(--color-card-bg);color:var(--text-main);
+ border-radius:10px;width:30px;height:30px;font-size:15px;cursor:pointer}
+.dlabel{flex:1;border:1px solid var(--color-card-border);background:var(--color-card-bg);
+ border-radius:var(--radius-tag);padding:7px 14px;font-size:13.5px;font-weight:600;
+ color:var(--text-main);cursor:pointer;text-align:center}
+.strip{display:flex;gap:6px;overflow-x:auto;padding:2px 0 8px;-webkit-overflow-scrolling:touch}
+.sday{flex:none;width:44px;text-align:center;cursor:pointer}
+.sday .swd{font-size:10.5px;color:var(--text-secondary);margin-bottom:3px}
+.sday .ring{width:38px;height:38px;border-radius:50%;border:2.5px solid var(--color-divider);
+ display:flex;align-items:center;justify-content:center;margin:0 auto;
+ font-size:13px;color:var(--text-secondary);background:var(--color-card-bg)}
+.sday.has .ring{border-color:var(--color-primary);color:var(--text-main);font-weight:600}
+.sday.sel .ring{background:var(--color-primary);border-color:var(--color-primary);color:#fff}
+.sday.sel .swd{color:var(--text-main);font-weight:600}
+.cxlink{color:var(--color-primary);cursor:pointer;text-decoration:underline;margin-left:10px}
+.calnav{display:flex;justify-content:center;gap:28px;margin-bottom:8px}
+.calnav button{border:0;background:none;font-size:16px;color:var(--text-secondary);cursor:pointer}
+.calwd,.calgrid{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;text-align:center}
+.calwd span{font-size:11px;color:var(--text-secondary)}
+.cday{width:38px;height:38px;border-radius:50%;border:2.5px solid var(--ring-bg);
+ display:flex;align-items:center;justify-content:center;margin:0 auto;
+ font-size:13px;color:var(--text-secondary);cursor:pointer}
+.cday.has{border-color:var(--color-primary);color:var(--text-main);font-weight:600}
+.cday.sel{background:var(--color-primary);border-color:var(--color-primary);color:#fff}
+.cday.dis{opacity:.35;cursor:default}
 .ring-track{stroke:var(--ring-bg)}
 .ring-fill{stroke:var(--ring-progress)}
 #avKcal{padding:16px 20px}
@@ -739,10 +765,21 @@ button{transition:transform .12s;font-family:var(--font-family)}
  <input type="file" id="photo" accept="image/*" style="display:none">
  <div id="reply"></div></div>
 <div class="card" id="wkCard"></div>
-<div class="card"><div style="display:flex;align-items:center;margin-bottom:6px">
- <div class="muted" style="flex:1">今日明细</div>
- <button id="clearBtn" style="border:1px solid var(--color-danger-border);background:var(--color-danger-soft);color:var(--color-danger);font-size:12.5px;font-weight:600;border-radius:var(--radius-tag);padding:6px 14px;cursor:pointer">清空</button></div>
+<div class="card"><div class="dchead">
+ <button class="navb" id="dPrev">‹</button>
+ <button class="dlabel" id="dLabel">今天</button>
+ <button class="navb" id="dNext">›</button>
+ <button id="clearBtn" style="margin-left:auto;border:1px solid var(--color-danger-border);background:var(--color-danger-soft);color:var(--color-danger);font-size:12.5px;font-weight:600;border-radius:var(--radius-tag);padding:6px 14px;cursor:pointer;display:none">清空</button></div>
+<div class="strip" id="strip"></div>
 <div id="list"></div></div>
+<div class="mback up" id="calBack" style="display:none">
+ <div class="sheet">
+  <div class="mhead"><b id="calTitle">2026年10月</b><button id="calClose">✕</button></div>
+  <div class="calnav"><button id="calPrevM">‹</button><button id="calNextM">›</button></div>
+  <div class="calwd"><span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span><span>日</span></div>
+  <div class="calgrid" id="calGrid"></div>
+  <div class="muted" style="text-align:center;font-size:11px;margin-top:6px">圈 = 当天有记录 · 灰色 = 未来</div>
+ </div></div>
 <div class="mback up" id="editBack" style="display:none">
  <div class="sheet">
   <div class="mhead"><b>编辑食物</b><button id="eClose">✕</button></div>
@@ -940,9 +977,52 @@ async function api(path,opts,tmo,retried){const ctl=("AbortController"in window)
   if(!r.ok)throw new Error((j&&j.error)||("HTTP "+r.status));return j;}
  finally{if(to)clearTimeout(to);}}
 let busy=false,timer=null,suppress=false,activeCtl=null;
+let viewDate=null;const monthDays={};const monthFetched={};
+function todayStr(){return new Date().toISOString().slice(0,10);}
+function labelFor(ds){const t=todayStr();
+ if(ds===t)return"今天";
+ const y=dstrShift(t,-1);if(ds===y)return"昨天";
+ const d=new Date(ds+"T12:00:00");
+ return (d.getMonth()+1)+"月"+d.getDate()+"日 "+["周日","周一","周二","周三","周四","周五","周六"][d.getDay()];}
+function dstrShift(base,n){const d=new Date((base||todayStr())+"T12:00:00");d.setDate(d.getDate()+n);return d.toISOString().slice(0,10);}
+function setViewDate(ds){if(ds>todayStr())ds=todayStr();
+ viewDate=(ds===todayStr())?null:ds;renderDateHead();refresh();}
+let calY=0,calM=0;
+function openCal(){const b=viewDate||todayStr();calY=+b.slice(0,4);calM=+b.slice(5,7);
+ showBack("calBack");renderCal();}
+$("dLabel").onclick=openCal;
+$("calClose").onclick=()=>hideBack("calBack");
+$("calPrevM").onclick=()=>{calM--;if(calM<1){calM=12;calY--;}
+ ensureMonth(calY+"-"+String(calM).padStart(2,"0"));renderCal();};
+$("calNextM").onclick=()=>{calM++;if(calM>12){calM=1;calY++;}
+ ensureMonth(calY+"-"+String(calM).padStart(2,"0"));renderCal();};
+function renderCal(){
+ $("calTitle").textContent=calY+"年"+calM+"月";
+ const first=new Date(calY,calM-1,1);
+ let lead=first.getDay()-1;if(lead<0)lead=6;
+ const dim=new Date(calY,calM,0).getDate();
+ const t=todayStr();const sel=viewDate||todayStr();
+ let h="";
+ for(let i=0;i<lead;i++)h+="<span></span>";
+ for(let d=1;d<=dim;d++){
+  const ds=calY+"-"+String(calM).padStart(2,"0")+"-"+String(d).padStart(2,"0");
+  const future=ds>t;
+  const has=(monthDays[ds]||{}).n>0;
+  const cls="cday"+(has?" has":"")+(future?" dis":"")+(ds===sel?" sel":"");
+  h+="<div class='"+cls+"' data-d='"+ds+"'>"+d+"</div>";
+ }
+ $("calGrid").innerHTML=h;
+ $("calGrid").querySelectorAll(".cday:not(.dis)").forEach(c=>c.onclick=()=>{
+  setViewDate(c.dataset.d);hideBack("calBack");});
+}
+function shiftDate(n){setViewDate(dstrShift(viewDate||todayStr(),n));}
+function renderDateHead(){
+ $("dLabel").textContent=labelFor(viewDate||todayStr());
+ $("dNext").style.visibility=viewDate?"visible":"hidden";
+ $("clearBtn").style.display=viewDate?"none":"";}
 const photoUrls={};
-async function loadThumb(id,img){
- try{const r=await fetch("/photo/"+id,TOKEN?{headers:{"X-Access-Token":TOKEN}}:{});
+async function loadThumb(id,img,uid){
+ try{const r=await fetch("/photo/"+id+(uid?"?user="+uid:""),TOKEN?{headers:{"X-Access-Token":TOKEN}}:{});
   if(!r.ok){img.style.display="none";return;}
   const b=await r.blob();
   if(photoUrls[id])URL.revokeObjectURL(photoUrls[id]);
@@ -966,52 +1046,59 @@ function toast(t){const el=$("toast");el.textContent=t;el.classList.add("show");
  setTimeout(()=>el.classList.remove("show"),2200);}
 const MEAL_ORD={"早餐":0,"午餐":1,"晚餐":2,"加餐":3};
 async function refresh(){
- try{const j=await api("/api/today?user="+user);
-  $("remain").textContent=j.remaining;
-  $("remain").classList.toggle("over",j.remaining<0);
-  const pct=Math.max(0,Math.min(100,j.target?j.eaten/j.target*100:0));
-  const bar=$("bar");bar.classList.toggle("warn",pct>85);
-  bar.firstElementChild.style.width=pct+"%";
-  $("sumline").textContent=(j.remaining<0?"⚠️ 已超出 "+(-j.remaining)+" 千卡 ｜ ":"")
-   +"已吃 "+j.eaten+" / "+j.target+" kcal ｜ 蛋白 "+j.protein+" / "+j.protein_target+" g";
-  const d=$("dinner");d.textContent=j.dinner_tip?("🌙 "+j.dinner_tip):"";d.classList.toggle("show",!!j.dinner_tip);
-  _recs={};j.records.forEach(r=>_recs[r.id]=r);
-  const RAT={"早餐":0.25,"午餐":0.35,"晚餐":0.30,"加餐":0.10};
-  const sug=m=>{const t=(j.target||0)*(RAT[m]||0);
-   return (Math.round(t*0.85/5)*5)+" ~ "+(Math.round(t*1.15/5)*5);};
-  const recs=[...j.records].sort((a,b)=>(MEAL_ORD[a.meal_type]??9)-(MEAL_ORD[b.meal_type]??9));
-  const groups=[];let cur=null;
-  for(const r of recs){
-   if(!cur||cur.m!==r.meal_type){cur={m:r.meal_type,items:[],tot:0};groups.push(cur);}
-   cur.items.push(r);cur.tot+=r.kcal||0;
+ try{const j=await api("/api/today?user="+user);renderHero(j);}
+ catch(e){toast("加载失败："+e.message);}
+ try{const j=await api("/api/today?user="+user+(viewDate?"&date="+viewDate:""));renderDetail(j);}
+ catch(e){toast("明细加载失败："+e.message);}
+ try{const pl=await api("/api/plan?user="+user);
+  const w=await api("/api/workouts?user="+user);
+  renderWK(pl,w.records||[]);
+ }catch(e){}
+ await ensureMonth(todayStr());renderStrip();renderDateHead();
+}
+function renderHero(j){
+ $("remain").textContent=j.remaining;
+ $("remain").classList.toggle("over",j.remaining<0);
+ const pct=Math.max(0,Math.min(100,j.target?j.eaten/j.target*100:0));
+ const bar=$("bar");bar.classList.toggle("warn",pct>85);
+ bar.firstElementChild.style.width=pct+"%";
+ $("sumline").textContent=(j.remaining<0?"⚠️ 已超出 "+(-j.remaining)+" 千卡 ｜ ":"")
+  +"已吃 "+j.eaten+" / "+j.target+" kcal ｜ 蛋白 "+j.protein+" / "+j.protein_target+" g";
+ const d=$("dinner");d.textContent=j.dinner_tip?("🌙 "+j.dinner_tip):"";d.classList.toggle("show",!!j.dinner_tip);
+}
+function renderDetail(j){
+ _recs={};j.records.forEach(r=>_recs[r.id]=r);
+ const RAT={"早餐":0.25,"午餐":0.35,"晚餐":0.30,"加餐":0.10};
+ const sug=m=>{const t=(j.target||0)*(RAT[m]||0);
+  return (Math.round(t*0.85/5)*5)+" ~ "+(Math.round(t*1.15/5)*5);};
+ const recs=[...j.records].sort((a,b)=>(MEAL_ORD[a.meal_type]??9)-(MEAL_ORD[b.meal_type]??9));
+ const groups=[];let cur=null;
+ for(const r of recs){
+  if(!cur||cur.m!==r.meal_type){cur={m:r.meal_type,items:[],tot:0};groups.push(cur);}
+  cur.items.push(r);cur.tot+=r.kcal||0;
+ }
+ const GEMO={"早餐":"☀️","午餐":"🌤️","晚餐":"🌙","加餐":"🍪"};
+ let h="";
+ for(const g of groups){
+  h+="<div class='card gcard'><div class='ghead'>"+
+   "<span class='gh-emoji'>"+(GEMO[g.m]||"🍽️")+"</span><span class='gh-name'>"+esc(g.m)+"</span>"+
+   "<div class='gh-tot'><small>本餐合计</small><b>"+g.tot+" 千卡</b></div></div>"+
+   "<div class='gsug'>热量建议："+sug(g.m)+" kcal</div>";
+  for(const r of g.items){
+   h+="<div class='mrow' data-id='"+r.id+"'>"+
+    "<div class='dz'><button class='delzone2' data-del='"+r.id+"' aria-label='删除"+esc(r.food)+"'>删除</button></div>"+
+    "<div class='mmain'>"+
+    (r.photo?"<img class='thumb' data-photo='"+r.id+"' alt=''>":"<div class='thumb ph' role='img' aria-label='暂无照片'>" +
+    "<svg width='26' height='26' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='1.6' stroke-linecap='round' aria-hidden='true'><path d='M4 13h16'/><path d='M5 13a7 7 0 0 0 14 0z'/></svg></div>")+
+    "<div class='mname'>"+esc(r.food)+"<div class='msub'>"+
+    [r.portion,r.note].filter(Boolean).map(esc).join(" · ")+"</div></div>"+
+    "<div class='kcell'><b>"+r.kcal+"</b> 千卡<span class='chev'>›</span></div></div></div>";
   }
-  const GEMO={"早餐":"☀️","午餐":"🌤️","晚餐":"🌙","加餐":"🍪"};
-  let h="";
-  for(const g of groups){
-   h+="<div class='card gcard'><div class='ghead'>"+
-    "<span class='gh-emoji'>"+(GEMO[g.m]||"🍽️")+"</span><span class='gh-name'>"+esc(g.m)+"</span>"+
-    "<div class='gh-tot'><small>本餐合计</small><b>"+g.tot+" 千卡</b></div></div>"+
-    "<div class='gsug'>热量建议："+sug(g.m)+" kcal</div>";
-   for(const r of g.items){
-    h+="<div class='mrow' data-id='"+r.id+"'>"+
-     "<div class='dz'><button class='delzone2' data-del='"+r.id+"' aria-label='删除"+esc(r.food)+"'>删除</button></div>"+
-     "<div class='mmain'>"+
-     (r.photo?"<img class='thumb' data-photo='"+r.id+"' alt=''>":"<div class='thumb ph' role='img' aria-label='暂无照片'>" +
-     "<svg width='26' height='26' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='1.6' stroke-linecap='round' aria-hidden='true'><path d='M4 13h16'/><path d='M5 13a7 7 0 0 0 14 0z'/></svg></div>")+
-     "<div class='mname'>"+esc(r.food)+"<div class='msub'>"+
-     [r.portion,r.note].filter(Boolean).map(esc).join(" · ")+"</div></div>"+
-     "<div class='kcell'><b>"+r.kcal+"</b> 千卡<span class='chev'>›</span></div></div></div>";
-   }
-   h+="</div>";
-  }
-  $("list").innerHTML=h||"<div class='muted' style='padding:8px 0'>还没有记录，开吃吧 🍚</div>";
-  document.querySelectorAll("#list img[data-photo]").forEach(im=>loadThumb(im.dataset.photo,im));
-  bindSwipe($("list"));
-  try{const pl=await api("/api/plan?user="+user);
-   const w=await api("/api/workouts?user="+user);
-   renderWK(pl,w.records||[]);
-  }catch(e){}
- }catch(e){toast("加载失败："+e.message);}
+  h+="</div>";
+ }
+ $("list").innerHTML=h||"<div class='muted' style='padding:8px 0'>这一天还没有记录</div>";
+ document.querySelectorAll("#list img[data-photo]").forEach(im=>loadThumb(im.dataset.photo,im,user));
+ bindSwipe($("list"));
 }
 let openId=null,suppressClick=false,_recs={};
 function closeOpen(exceptId){document.querySelectorAll("#list .mrow").forEach(row=>{
@@ -1237,7 +1324,7 @@ $("photo").addEventListener("change",async e=>{
 let editId0=null,editB64=null,editBusy=false,delId0=null;
 function openEdit(id){
  const r=_recs[id];if(!r)return;editId0=id;editB64=null;
- if(r.photo){$("eThumb").style.display="block";$("eThumbPh").style.display="none";loadThumb(id,$("eThumb"));}
+ if(r.photo){$("eThumb").style.display="block";$("eThumbPh").style.display="none";loadThumb(id,$("eThumb"),user);}
  else{$("eThumb").style.display="none";$("eThumbPh").style.display="flex";}
  $("eFood").value=r.food;$("ePortion").value=r.portion||"";
  $("eKcal").value=r.kcal;$("eProtein").value=(r.protein_g==null?"":r.protein_g);
@@ -1303,6 +1390,28 @@ $("cOk").onclick=async()=>{
 function bump(){const el=$("remain");el.classList.remove("bump");void el.offsetWidth;el.classList.add("bump");}
 // ---- 本周训练卡（计划 vs 实际）----
 const WKDAYS=["周一","周二","周三","周四","周五","周六","周日"];
+async function ensureMonth(ym){
+ if(monthFetched[ym])return;monthFetched[ym]=true;
+ try{const j=await api("/api/month?user="+user+"&ym="+ym);
+  j.days.forEach(d=>monthDays[d.date]={eaten:d.eaten,n:d.n});
+ }catch(e){delete monthFetched[ym];}
+}
+function renderStrip(){
+ const el=$("strip");let h="";
+ const sel=viewDate||todayStr();
+ for(let i=6;i>=0;i--){
+  const d=new Date();d.setDate(d.getDate()-i);
+  const ds=d.toISOString().slice(0,10);
+  const wd=["日","一","二","三","四","五","六"][d.getDay()];
+  const lbl=i===0?"今":wd;
+  const n=(monthDays[ds]||{}).n||0;
+  const selCls=(ds===sel)?" sel":"";
+  h+="<div class='sday"+(n>0?" has":"")+selCls+"' data-d='"+ds+"'>"+
+   "<div class='swd'>"+lbl+"</div><div class='ring'>"+d.getDate()+"</div></div>";
+ }
+ el.innerHTML=h;
+ el.querySelectorAll(".sday").forEach(sd=>sd.onclick=()=>setViewDate(sd.dataset.d));
+}
 function renderWK(plan,wk){
  const el=$("wkCard");
  if(!plan.days||!plan.days.length){
@@ -1399,6 +1508,23 @@ class H(BaseHTTPRequestHandler):
             self._json(200, {"ok": True, "msg": "部署已触发，约 10 秒后生效"})
         elif p == "/api/mockcfg":
             self._json(200, {"mock": bool(CFG.get("mock", False))})
+        elif p == "/api/month":
+            if not self._authed():
+                return self._json(401, {"error": "需要访问码"})
+            q = parse_qs(urlparse(self.path).query)
+            user = (q.get("user") or ["beifeng"])[0]
+            if user not in USERS:
+                return self._json(400, {"error": "未知用户"})
+            ym = (q.get("ym") or [""])[0]
+            if not re.match(r"^\d{4}-\d{2}$", ym):
+                return self._json(400, {"error": "ym 格式须为 YYYY-MM"})
+            with db() as conn:
+                rows = conn.execute(
+                    "SELECT date, SUM(kcal) eaten, COUNT(*) n FROM meals"
+                    " WHERE user_id=? AND date LIKE ? GROUP BY date ORDER BY date",
+                    (user, ym + "%")).fetchall()
+            self._json(200, {"ym": ym, "days": [
+                {"date": r["date"], "eaten": r["eaten"] or 0, "n": r["n"]} for r in rows]})
         elif p == "/api/plan":
             if not self._authed():
                 return self._json(401, {"error": "需要访问码"})
@@ -1442,7 +1568,12 @@ class H(BaseHTTPRequestHandler):
             user = (q.get("user") or ["beifeng"])[0]
             if user not in USERS:
                 return self._json(400, {"error": "未知用户"})
-            self._json(200, today_summary(user))
+            date = (q.get("date") or [""])[0]
+            if date and not re.match(r"^\d{4}-\d{2}-\d{2}$", date):
+                return self._json(400, {"error": "日期格式不合法"})
+            if date and date > datetime.now().strftime("%Y-%m-%d"):
+                return self._json(400, {"error": "不能查看未来的记录"})
+            self._json(200, today_summary(user, date or None))
         elif p == "/api/profile":
             if not self._authed():
                 return self._json(401, {"error": "需要访问码"})
