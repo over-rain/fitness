@@ -841,6 +841,15 @@ async function api(path,opts,tmo){const ctl=("AbortController"in window)?new Abo
   if(!r.ok)throw new Error((j&&j.error)||("HTTP "+r.status));return j;}
  finally{if(to)clearTimeout(to);}}
 let busy=false,timer=null,suppress=false;
+const photoUrls={};
+async function loadThumb(id,img){
+ try{const r=await fetch("/photo/"+id,TOKEN?{headers:{"X-Access-Token":TOKEN}}:{});
+  if(!r.ok){img.style.display="none";return;}
+  const b=await r.blob();
+  if(photoUrls[id])URL.revokeObjectURL(photoUrls[id]);
+  photoUrls[id]=URL.createObjectURL(b);img.src=photoUrls[id];
+ }catch(e){img.style.display="none";}
+}
 function setLoading(msg){busy=true;$("bPhoto").disabled=true;$("bSend").disabled=true;
  suppress=false;
  const el=$("reply"),t0=Date.now();el.className="wait";
@@ -885,7 +894,7 @@ async function refresh(){
     h+="<div class='mrow' data-id='"+r.id+"'>"+
      "<div class='dz'><button class='delzone2' data-del='"+r.id+"' aria-label='删除"+esc(r.food)+"'>删除</button></div>"+
      "<div class='mmain'>"+
-     (r.photo?"<img class='thumb' src='/photo/"+r.id+"' alt=''>":"<div class='thumb ph' role='img' aria-label='暂无照片'>" +
+     (r.photo?"<img class='thumb' data-photo='"+r.id+"' alt=''>":"<div class='thumb ph' role='img' aria-label='暂无照片'>" +
      "<svg width='26' height='26' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='1.6' stroke-linecap='round' aria-hidden='true'><path d='M4 13h16'/><path d='M5 13a7 7 0 0 0 14 0z'/></svg></div>")+
      "<div class='mname'>"+esc(r.food)+"<div class='msub'>"+
      [r.portion,r.note].filter(Boolean).map(esc).join(" · ")+"</div></div>"+
@@ -894,6 +903,7 @@ async function refresh(){
    h+="</div>";
   }
   $("list").innerHTML=h||"<div class='muted' style='padding:8px 0'>还没有记录，开吃吧 🍚</div>";
+  document.querySelectorAll("#list img[data-photo]").forEach(im=>loadThumb(im.dataset.photo,im));
   bindSwipe($("list"));
  }catch(e){toast("加载失败："+e.message);}
 }
@@ -1118,7 +1128,7 @@ $("photo").addEventListener("change",async e=>{
 let editId0=null,editB64=null,editBusy=false,delId0=null;
 function openEdit(id){
  const r=_recs[id];if(!r)return;editId0=id;editB64=null;
- if(r.photo){$("eThumb").src="/photo/"+id;$("eThumb").style.display="block";$("eThumbPh").style.display="none";}
+ if(r.photo){$("eThumb").style.display="block";$("eThumbPh").style.display="none";loadThumb(id,$("eThumb"));}
  else{$("eThumb").style.display="none";$("eThumbPh").style.display="flex";}
  $("eFood").value=r.food;$("ePortion").value=r.portion||"";
  $("eKcal").value=r.kcal;$("eProtein").value=(r.protein_g==null?"":r.protein_g);
