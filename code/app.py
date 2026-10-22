@@ -1318,6 +1318,9 @@ class H(BaseHTTPRequestHandler):
                 supplied = self.headers.get("X-Gitee-Token") or self.headers.get("X-Access-Token") or ""
                 if not tok or not hmac.compare_digest(supplied, tok):
                     return self._json(401, {"error": "token 不匹配"})
+                ev = self.headers.get("X-Gitee-Event") or ""
+                if ev and ev != "tag_push":
+                    return self._json(200, {"ok": True, "msg": "非 tag 事件，跳过部署"})
                 self._trigger_deploy()
                 self._json(200, {"ok": True, "msg": "部署已触发"})
         except ApiError as ex:
