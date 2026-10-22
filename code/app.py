@@ -82,6 +82,13 @@ def load_config():
 
 CFG = load_config()
 
+PLAN_PARSE_PROMPT = (
+    "把用户的每周训练计划文本解析成结构化 JSON。只输出 JSON，不要其他文字："
+    '{"days":[{"dow":"周一","parts":[{"name":"动作/部位名","sets_reps":"组次组数如4x12"}]}]}'
+    "规则：dow 只能取 周一~周日；按原文顺序完整解析，不遗漏不臆造；"
+    "原文没提的动作不要编。无法解析 → {\"days\":[]}。"
+)
+
 # 复用已验证的热量计算（Mifflin-St Jeor）
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "scripts"))
 from fitness_lib import plan as calc_plan  # noqa: E402
@@ -187,6 +194,52 @@ def load_food_table():
     return out
 
 
+DOW = ["周一", "周二", "周三", "周四", "周五", "周六", "周日"]
+
+def plan_path(user_id):
+    return os.path.join(DATA, "plans", "weekly_plan_%s.json" % user_id)
+
+def load_plan(user_id):
+    p = plan_path(user_id)
+    if not os.path.exists(p):
+        return None
+    try:
+        with open(p, encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:
+        return None
+
+def save_plan(user_id, plan):
+    os.makedirs(os.path.join(DATA, "plans"), exist_ok=True)
+    with open(plan_path(user_id), "w", encoding="utf-8") as f:
+        json.dump(plan, f, ensure_ascii=False, indent=2)
+
+def plan_hint(user_id, date_str):
+    """返回今天计划提示（无计划/今天无安排 → None）"""
+    plan = load_plan(user_id)
+    if not plan:
+        return None
+    try:
+        dow = DOW[datetime.strptime(date_str, "%Y-%m-%d").weekday()]
+    except ValueError:
+        return None
+    for d in plan.get("days", []):
+        if d.get("dow") == dow:
+            parts = "、".join((p.get("name") or "") + " " + (p.get("sets_reps") or "")
+                              for p in d.get("parts", []))
+            if parts.strip():
+                return "📋 今天计划：" + parts.strip()
+    return None
+
+def week_workouts(user_id):
+    today = datetime.now()
+    monday = today - timedelta(days=today.weekday())
+    wk_start = monday.strftime("%Y-%m-%d")
+    with db() as conn:
+        return [dict(r) for r in conn.execute(
+            "SELECT id,date,action,sets_reps,est_kcal FROM workouts WHERE user_id=? AND date>=? ORDER BY id",
+            (user_id, wk_start)).fetchall()]
+
 def table_lookup(food):
     """查表：精确命中，或近似命中（food 与表名长度差 ≤2，如"半碗米饭"↔"米饭"）。
     组合餐名（"一碗米饭一份蔬菜"）长度差过大 → 不命中，走 [估]。"""
@@ -213,9 +266,10 @@ def infer_meal_type():
 
 # ---------------------------------------------------------------- 模型调用
 
-def llm_analyze(text, image_b64, recent=None, extra="", llm_cfg=None, timeout=120):
+def llm_analyze(text, image_b64, recent=None, extra="", llm_cfg=None, timeout=120, prompt=None):
     """识别食物+判断意图；mock 模式返回固定结果。协议按配置：openai(默认) / anthropic
-    llm_cfg：可选的独立模型配置（文字通道快模型），缺省用主配置"""
+    llm_cfg：可选的独立模型配置（文字通道快模型），缺省用主配置
+    prompt：覆盖默认的 ANALYZE_PROMPT（计划解析等场景用）"""
     if CFG.get("mock"):
         src = text or "(图片)"
         return {"action": "record", "id": 0,
@@ -230,12 +284,12 @@ def llm_analyze(text, image_b64, recent=None, extra="", llm_cfg=None, timeout=12
         ctx += "\n用户输入：" + text
     ctx += extra
     if llm.get("protocol") == "anthropic":
-        return _anthropic_analyze(text, image_b64, llm, ctx, timeout=timeout)
+        return _anthropic_analyze(text, image_b64, llm, ctx, timeout=timeout, prompt=prompt)
     content = []
     if image_b64:
         content.append({"type": "image_url",
                         "image_url": {"url": "data:image/jpeg;base64," + image_b64}})
-    content.append({"type": "text", "text": ANALYZE_PROMPT + ctx})
+    content.append({"type": "text", "text": (prompt or ANALYZE_PROMPT) + ctx})
     payload = json.dumps({"model": llm["model"], "messages": [{"role": "user", "content": content}],
                           "temperature": 0.2}).encode("utf-8")
     req = urllib.request.Request(
@@ -248,7 +302,7 @@ def llm_analyze(text, image_b64, recent=None, extra="", llm_cfg=None, timeout=12
     return _extract_json(raw)
 
 
-def _anthropic_analyze(text, image_b64, llm, extra="", timeout=120):
+def _anthropic_analyze(text, image_b64, llm, extra="", timeout=120, prompt=None):
     """Anthropic /v1/messages 协议（如火山方舟 coding 网关）。
     用流式请求：思考型模型思考阶段持续吐 delta，连接不会因长时间无响应被网关掐掉
     （非流式在网关高峰会被掐 → 用户端 TimeoutError）。
@@ -257,7 +311,7 @@ def _anthropic_analyze(text, image_b64, llm, extra="", timeout=120):
     if image_b64:
         content.append({"type": "image",
                         "source": {"type": "base64", "media_type": "image/jpeg", "data": image_b64}})
-    content.append({"type": "text", "text": ANALYZE_PROMPT + extra})
+    content.append({"type": "text", "text": (prompt or ANALYZE_PROMPT) + extra})
     last_err = ""
     for _ in range(2):
         payload = json.dumps({"model": llm["model"], "max_tokens": 6000, "stream": True,
@@ -503,6 +557,9 @@ input[type=text]:focus{border-color:var(--color-primary)}
 .chip{display:inline-block;background:var(--color-primary-soft);color:var(--color-primary);
  border-radius:6px;padding:1px 6px;font-size:11px;margin-right:6px}
 .gcard{padding:14px}
+.wkrow{display:flex;align-items:center;gap:6px;padding:6px 2px;font-size:13px;
+ color:var(--text-secondary);border-bottom:1px dashed var(--color-divider)}
+.wkrow:last-child{border-bottom:0}
 .ghead{display:flex;align-items:center;gap:8px;padding:0 2px 2px}
 .gh-emoji{font-size:18px}
 .gh-name{font-size:16px;font-weight:700;color:var(--text-main)}
@@ -681,6 +738,7 @@ button{transition:transform .12s;font-family:var(--font-family)}
   <button class="send" id="bSend">发送</button></div>
  <input type="file" id="photo" accept="image/*" style="display:none">
  <div id="reply"></div></div>
+<div class="card" id="wkCard"></div>
 <div class="card"><div style="display:flex;align-items:center;margin-bottom:6px">
  <div class="muted" style="flex:1">今日明细</div>
  <button id="clearBtn" style="border:1px solid var(--color-danger-border);background:var(--color-danger-soft);color:var(--color-danger);font-size:12.5px;font-weight:600;border-radius:var(--radius-tag);padding:6px 14px;cursor:pointer">清空</button></div>
@@ -715,7 +773,7 @@ button{transition:transform .12s;font-family:var(--font-family)}
 <div class="mback" id="mback">
  <div class="modal">
   <div class="mhead"><b>设置</b><button id="mclose">✕</button></div>
-  <div class="tabs"><button class="tab on" id="tProfile">👤 个人信息</button><button class="tab" id="tGeneral">⚙️ 通用</button></div>
+  <div class="tabs"><button class="tab on" id="tProfile">👤 个人信息</button><button class="tab" id="tGeneral">⚙️ 通用</button><button class="tab" id="tPlan">🏋️ 训练计划</button></div>
   <div class="panel on" id="pProfile">
    <div class="muted" style="margin-bottom:9px">保存后自动按 Mifflin-St Jeor 重算热量线</div>
    <div class="grid">
@@ -739,6 +797,12 @@ button{transition:transform .12s;font-family:var(--font-family)}
    <label style="display:flex;align-items:flex-start;gap:9px;cursor:pointer;padding:4px 2px">
     <input type="checkbox" id="mockChk" style="width:17px;height:17px;margin-top:2px">
     <span style="font-size:13.5px">测试模式<br><span class="muted" style="font-size:11.5px">识别立即返回示例数据，不请求大模型（用于测试界面与入库流程）</span></span></label>
+  </div>
+  <div class="panel" id="pPlan">
+   <div class="muted" style="margin-bottom:6px">把你的每周训练计划文本粘贴到这里（例：周一 胸 卧推4x12 飞鸟3x15；周三 背 杠铃划船4x10……），AI 解析成结构化计划。已存计划会被覆盖。</div>
+   <textarea id="pText" maxlength="2000" placeholder="周一 胸 卧推4x12 飞鸟3x15&#10;周三 背 杠铃划船4x10&#10;周五 腿 深蹲4x12……" style="width:100%;height:130px;box-sizing:border-box;border:1.5px solid var(--color-card-border);border-radius:12px;padding:11px 12px;font-size:14px;outline:none;background:var(--color-card-bg);color:var(--text-main);resize:vertical;font-family:var(--font-family)"></textarea>
+   <div class="ebtns"><button class="ghost" id="pParse">🔍 解析预览</button><button class="primary" id="pSaveP">💾 保存计划</button></div>
+   <div class="muted" id="pPrev" style="margin-top:9px;white-space:pre-wrap;font-size:12px"></div>
   </div>
  </div></div>
 </div>
@@ -803,6 +867,39 @@ $("tProfile").onclick=()=>{$("tProfile").classList.add("on");$("tGeneral").class
  $("pProfile").classList.add("on");$("pGeneral").classList.remove("on");};
 $("tGeneral").onclick=()=>{$("tGeneral").classList.add("on");$("tProfile").classList.remove("on");
  $("pGeneral").classList.add("on");$("pProfile").classList.remove("on");};
+function showPTab(tabId,panelId){["tProfile","tGeneral","tPlan"].forEach(t=>$(t).classList.toggle("on",t===tabId));
+ ["pProfile","pGeneral","pPlan"].forEach(p=>$(p).classList.toggle("on",p===panelId));}
+$("tPlan").onclick=()=>{showPTab("tPlan","pPlan");loadPlanView();};
+let curPlan={days:[]};
+async function loadPlanView(){
+ try{const p=await api("/api/plan?user="+user);
+  curPlan=p&&p.days?p:{days:[]};
+  $("pPrev").textContent=curPlan.days.length?
+   "当前计划（保存新的会覆盖）：\n"+curPlan.days.map(d=>d.dow+"："+d.parts.map(x=>x.name+(x.sets_reps?" "+x.sets_reps:"")).join("、")).join("\n")
+   :"还没有训练计划";
+ }catch(e){$("pPrev").textContent="读取失败："+e.message;}
+}
+$("pParse").onclick=async()=>{
+ const t=$("pText").value.trim();if(!t){toast("先粘贴计划文本");return;}
+ $("pParse").disabled=true;$("pPrev").textContent="解析中…";
+ try{const j=await api("/api/plan/parse",{method:"POST",headers:{"Content-Type":"application/json"},
+  body:JSON.stringify({user:user,text:t})},120000);
+  if(j.days&&j.days.length){$("pPrev").textContent="解析结果预览：\n"+j.days.map(d=>d.dow+"："+d.parts.map(x=>x.name+(x.sets_reps?" "+x.sets_reps:"")).join("、")).join("\n")+"\n\n确认无误后点「保存计划」";}
+  else{$("pPrev").textContent="⚠️ 没解析出内容，检查文本格式（每行：星期 动作 组次）";}
+ }catch(e){$("pPrev").textContent="解析失败："+e.message;}
+ $("pParse").disabled=false;
+};
+let curParsed=null;
+$("pSaveP").onclick=async()=>{
+ if(!curParsed){toast("先点「解析预览」生成计划");return;}
+ $("pSaveP").disabled=true;
+ try{const j=await api("/api/plan",{method:"POST",headers:{"Content-Type":"application/json"},
+  body:JSON.stringify({user:user,plan:curParsed})},60000);
+  curPlan={days:j.days||[]};
+  toast("已保存 "+curPlan.days.length+" 天计划");loadPlanView();
+ }catch(e){toast("保存失败："+e.message);}
+ $("pSaveP").disabled=false;
+};
 async function loadProfile(){
  try{const p=await api("/api/profile?user="+user);
   $("s_name").value=p.display_name||"";$("s_gender").value=p.gender||"male";
@@ -830,17 +927,19 @@ $("s_save").onclick=async()=>{
 paintSeg();
 const esc=s=>String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
 let TOKEN=localStorage.getItem("fg_token")||"";
-async function api(path,opts,tmo){const ctl=("AbortController"in window)?new AbortController():null;
+async function api(path,opts,tmo,retried){const ctl=("AbortController"in window)?new AbortController():null;
  const to=ctl?setTimeout(()=>ctl.abort(),tmo||180000):null;
+ if(ctl&&opts&&opts.signal)opts.signal.addEventListener("abort",()=>ctl.abort());
+ activeCtl=ctl;
  const h=Object.assign({},(opts&&opts.headers)||{});
  if(TOKEN)h["X-Access-Token"]=TOKEN;
  try{const r=await fetch(path,Object.assign({},opts,{headers:h},ctl?{signal:ctl.signal}:{}));
   let j=null;try{j=await r.json()}catch(_){}
-  if(r.status===401){const c=prompt("此站受访问码保护，请输入访问码：");
-   if(c){TOKEN=c;localStorage.setItem("fg_token",c);throw new Error("访问码已记录，请重试刚才的操作");}}
+  if(r.status===401&&!retried){const c=prompt("此站受访问码保护，请输入访问码：");
+   if(c){TOKEN=c;localStorage.setItem("fg_token",c);return api(path,opts,tmo,true);}}
   if(!r.ok)throw new Error((j&&j.error)||("HTTP "+r.status));return j;}
  finally{if(to)clearTimeout(to);}}
-let busy=false,timer=null,suppress=false;
+let busy=false,timer=null,suppress=false,activeCtl=null;
 const photoUrls={};
 async function loadThumb(id,img){
  try{const r=await fetch("/photo/"+id,TOKEN?{headers:{"X-Access-Token":TOKEN}}:{});
@@ -853,11 +952,14 @@ async function loadThumb(id,img){
 function setLoading(msg){busy=true;$("bPhoto").disabled=true;$("bSend").disabled=true;
  suppress=false;
  const el=$("reply"),t0=Date.now();el.className="wait";
- el.innerHTML="<span class='spin'></span>"+msg+" <b id='el'></b>";
+ el.innerHTML="<span class='spin'></span>"+msg+" <b id='el'></b>"+
+  "<span class='cxlink' onclick='cancelWait()'>取消等待</span>";
  timer=setInterval(()=>{const el=$("el");if(!el){if(timer)clearInterval(timer);return;}
   const s=Math.round((Date.now()-t0)/1000);
   el.textContent=s+"s"+(s>12?" · 大图高峰会慢些":"");},500);}
 function done(){busy=false;$("bPhoto").disabled=false;$("bSend").disabled=false;if(timer)clearInterval(timer);}
+let sendCtl=null;
+function cancelWait(){if(activeCtl)activeCtl.abort();}
 function showOk(t){done();if(suppress)return;const el=$("reply");el.className="ok";el.textContent=t;}
 function showErr(t){done();if(suppress)return;const el=$("reply");el.className="err";el.textContent="❌ "+t;}
 function toast(t){const el=$("toast");el.textContent=t;el.classList.add("show");
@@ -867,7 +969,7 @@ async function refresh(){
  try{const j=await api("/api/today?user="+user);
   $("remain").textContent=j.remaining;
   $("remain").classList.toggle("over",j.remaining<0);
-  const pct=Math.min(100,j.target?j.eaten/j.target*100:0);
+  const pct=Math.max(0,Math.min(100,j.target?j.eaten/j.target*100:0));
   const bar=$("bar");bar.classList.toggle("warn",pct>85);
   bar.firstElementChild.style.width=pct+"%";
   $("sumline").textContent=(j.remaining<0?"⚠️ 已超出 "+(-j.remaining)+" 千卡 ｜ ":"")
@@ -905,6 +1007,10 @@ async function refresh(){
   $("list").innerHTML=h||"<div class='muted' style='padding:8px 0'>还没有记录，开吃吧 🍚</div>";
   document.querySelectorAll("#list img[data-photo]").forEach(im=>loadThumb(im.dataset.photo,im));
   bindSwipe($("list"));
+  try{const pl=await api("/api/plan?user="+user);
+   const w=await api("/api/workouts?user="+user);
+   renderWK(pl,w.records||[]);
+  }catch(e){}
  }catch(e){toast("加载失败："+e.message);}
 }
 let openId=null,suppressClick=false,_recs={};
@@ -949,7 +1055,8 @@ async function sendText(){
  }catch(e){showErr(friendly(e.message));}
 }
 function friendly(m){
- if(/timed out|abort/i.test(m))return "网关高峰无响应（已等待超时）。稍后重试；长语音建议拆成按餐短句，更快更稳";
+ if(/abort/i.test(m))return "已取消等待（后台可能已记上，稍后在明细核对）";
+ if(/timed out/i.test(m))return "网关高峰无响应（已等待超时）。稍后重试；长语音建议拆成按餐短句，更快更稳";
  if(/api_key/i.test(m))return m;
  return m;
 }
@@ -1038,7 +1145,9 @@ function mcard(label,mealVal,dayVal,target){
   "<div class='mc-n'>已吃 <b>"+dayVal+"g</b> / 目标 <b>"+(target||0)+"g</b></div></div>";
 }
 function closeAv(){$("av").style.display="none";avBusy=false;}
-$("avBack").onclick=closeAv;
+$("avBack").onclick=()=>{
+ if(avItems.length&&!avSaved&&!confirm("识别结果未保存，确定放弃吗？"))return;
+ closeAv();};
 $("avMeal").onclick=e=>{e.stopPropagation();
  const m=$("avmenu");m.style.display=m.style.display==="block"?"none":"block";};
 $("avmenu").addEventListener("click",e=>{const b=e.target.closest("button");if(!b)return;
@@ -1121,7 +1230,7 @@ $("photo").addEventListener("change",async e=>{
    body:JSON.stringify({user:user,image:avB64})},200000);
   avItems=j.items||[];if(j.targets)avTarget=j.targets;if(j.day)avDay=j.day;renderAv();
   if(!avItems.length)$("avItems").innerHTML="<div class='avload'>🤔 没识别出食物：点「AI 修正」描述一下，或返回重拍</div>";
- }catch(err){avDone();toast("识别失败："+err.message);closeAv();}
+ }catch(err){avDone();toast("识别失败："+friendly(err.message));closeAv();}
  avBusyUI(false);avBusy=false;
 });
 // ---- 编辑抽屉 & 删除确认 ----
@@ -1175,7 +1284,7 @@ $("eSave").onclick=async()=>{
     food:$("eFood").value.trim()||undefined,kcal:kcalV===""?undefined:parseFloat(kcalV),
     portion:$("ePortion").value.trim(),protein_g:$("eProtein").value===""?undefined:parseFloat($("eProtein").value),
     meal_type:meal,image:editB64||undefined})},60000);
-  closeEdit();bump();refresh();
+  closeEdit();bump();refresh();toast("已保存 ✓");
  }catch(e){toast("保存失败："+e.message);}
  $("eSave").disabled=false;$("eSave").textContent="保存修改";editBusy=false;
 };
@@ -1192,6 +1301,32 @@ $("cOk").onclick=async()=>{
  clearing=false;
 };
 function bump(){const el=$("remain");el.classList.remove("bump");void el.offsetWidth;el.classList.add("bump");}
+// ---- 本周训练卡（计划 vs 实际）----
+const WKDAYS=["周一","周二","周三","周四","周五","周六","周日"];
+function renderWK(plan,wk){
+ const el=$("wkCard");
+ if(!plan.days||!plan.days.length){
+  el.innerHTML="<div style='display:flex;align-items:center'><div class='muted' style='flex:1'>🏋️ 还没有训练计划</div>"+
+   "<button class='tag' style='cursor:pointer' onclick='showPTab(\"tPlan\",\"pPlan\")'>去设置导入</button></div>";
+  return;}
+ const doneBy={};wk.forEach(w=>doneBy[w.date]=(doneBy[w.date]||0)+1);
+ const monday=new Date();monday.setDate(monday.getDate()-monday.getDay()+1);
+ const today=new Date().toISOString().slice(0,10);
+ let h="<div style='display:flex;align-items:center;margin-bottom:6px'>"+
+  "<div style='font-weight:700;color:var(--text-main)'>🏋️ 本周训练</div>"+
+  "<div class='muted' style='margin-left:auto'>计划 "+plan.days.length+" 练 · 已练 "+wk.length+"</div></div>";
+ for(const d of plan.days){
+  const idx=WKDAYS.indexOf(d.dow);if(idx<0)continue;
+  const ds=new Date(monday);ds.setDate(ds.getDate()+idx);
+  const dsStr=ds.toISOString().slice(0,10);
+  const dn=doneBy[dsStr]||0;
+  const mark=dn>0?"<span style='color:var(--color-primary);font-weight:700'>✓</span>":
+   (dsStr===today?"<span class='tag'>今天</span>":(dsStr<today?"<span class='muted'>✗</span>":"<span class='muted'>未到</span>"));
+  h+="<div class='wkrow'><span class='chip'>"+d.dow+"</span><span style='flex:1;color:var(--text-main)'>"+
+   d.parts.map(p=>esc(p.name)+(p.sets_reps?" "+esc(p.sets_reps):"")).join("、")+"</span>"+mark+"</div>";
+ }
+ el.innerHTML=h;
+}
 // ---- 减脂缺口滑块：实时计算明细 ----
 function updateCalc(){
  const w=parseFloat($("s_weight").value),h=parseFloat($("s_height").value),a=parseFloat($("s_age").value);
@@ -1264,6 +1399,23 @@ class H(BaseHTTPRequestHandler):
             self._json(200, {"ok": True, "msg": "部署已触发，约 10 秒后生效"})
         elif p == "/api/mockcfg":
             self._json(200, {"mock": bool(CFG.get("mock", False))})
+        elif p == "/api/plan":
+            if not self._authed():
+                return self._json(401, {"error": "需要访问码"})
+            q = parse_qs(urlparse(self.path).query)
+            user = (q.get("user") or ["beifeng"])[0]
+            if user not in USERS:
+                return self._json(400, {"error": "未知用户"})
+            self._json(200, load_plan(user) or {"days": []})
+        elif p == "/api/workouts":
+            if not self._authed():
+                return self._json(401, {"error": "需要访问码"})
+            q = parse_qs(urlparse(self.path).query)
+            user = (q.get("user") or ["beifeng"])[0]
+            if user not in USERS:
+                return self._json(400, {"error": "未知用户"})
+            wk = week_workouts(user)
+            self._json(200, {"records": wk, "count": len(wk)})
         elif p.startswith("/photo/"):
             if not self._authed():
                 return self._send(404, "image/jpeg", b"")
@@ -1271,6 +1423,13 @@ class H(BaseHTTPRequestHandler):
                 rid = int(p.split("/")[2])
             except ValueError:
                 return self._send(404, "text/plain", b"not found")
+            # BUG-03：归属校验——?user= 需与记录的 user_id 一致
+            q = parse_qs(urlparse(self.path).query)
+            u = (q.get("user") or [""])[0]
+            with db() as conn:
+                row = conn.execute("SELECT user_id FROM meals WHERE id=?", (rid,)).fetchone()
+            if row is None or (u and row["user_id"] != u):
+                return self._send(404, "image/jpeg", b"")
             fp = os.path.join(DATA, "meals", "record_%d.jpg" % rid)
             if not os.path.exists(fp):
                 return self._send(404, "text/plain", b"not found")
@@ -1298,7 +1457,7 @@ class H(BaseHTTPRequestHandler):
 
     def do_POST(self):
         p = urlparse(self.path).path
-        if p not in ("/api/meal", "/api/correct", "/api/profile", "/api/analyze", "/api/save", "/api/clear", "/api/mockcfg", "/deploy"):
+        if p not in ("/api/meal", "/api/correct", "/api/profile", "/api/analyze", "/api/save", "/api/clear", "/api/mockcfg", "/deploy", "/api/plan", "/api/plan/parse", "/api/workouts"):
             return self._send(404, "text/plain", b"not found")
         if p == "/deploy":
             pass  # /deploy 有独立的 token 校验（Gitee Webhook 只带 X-Gitee-Token，不过通用门卫）
@@ -1325,6 +1484,34 @@ class H(BaseHTTPRequestHandler):
                 with open(CFG_PATH, "w", encoding="utf-8") as f:
                     json.dump(CFG, f, ensure_ascii=False, indent=2)
                 self._json(200, {"ok": True, "mock": CFG["mock"]})
+            if p == "/api/plan":
+                j = json.loads(body.decode("utf-8"))
+                user = j.get("user")
+                if user not in USERS:
+                    return self._json(400, {"error": "user 必须是 beifeng / gagayouna"})
+                plan = j.get("plan") or {}
+                if not isinstance(plan.get("days"), list) or not plan["days"]:
+                    return self._json(400, {"error": "计划为空或格式不对"})
+                for d in plan["days"]:
+                    if d.get("dow") not in DOW:
+                        return self._json(400, {"error": "dow 不合法：须为 周一~周日"})
+                save_plan(user, plan)
+                self._json(200, {"ok": True, "days": len(plan["days"])})
+            if p == "/api/plan/parse":
+                j = json.loads(body.decode("utf-8"))
+                user = j.get("user")
+                if user not in USERS:
+                    return self._json(400, {"error": "user 必须是 beifeng / gagayouna"})
+                text = (j.get("text") or "").strip()
+                if not text:
+                    return self._json(400, {"error": "粘贴计划文本"})
+                llm = CFG.get("text_llm") or CFG["llm"]
+                if not CFG.get("mock") and not llm.get("api_key"):
+                    return self._json(503, {"error": "未配置 api_key"})
+                res = llm_analyze(None, None, None,
+                                  extra="\n计划文本：" + text,
+                                  llm_cfg=llm, timeout=120, prompt=PLAN_PARSE_PROMPT)
+                self._json(200, res)
             if p == "/deploy":
                 tok = CFG.get("access_code") or ""
                 supplied = self.headers.get("X-Gitee-Token") or self.headers.get("X-Access-Token") or ""
@@ -1341,7 +1528,7 @@ class H(BaseHTTPRequestHandler):
             self._json(500, {"error": repr(ex)})
 
     def _handle_clear(self, j):
-        """清空今日该用户全部记录（含照片文件）"""
+        """清空今日该用户全部记录（含照片文件，含训练记录）"""
         user = j.get("user")
         if user not in USERS:
             raise ApiError("user 必须是 beifeng / gagayouna")
@@ -1349,6 +1536,7 @@ class H(BaseHTTPRequestHandler):
         with db() as conn:
             rows = conn.execute("SELECT id FROM meals WHERE user_id=? AND date=?", (user, date)).fetchall()
             conn.execute("DELETE FROM meals WHERE user_id=? AND date=?", (user, date))
+            conn.execute("DELETE FROM workouts WHERE user_id=? AND date=?", (user, date))
         for r in rows:
             try:
                 os.remove(os.path.join(DATA, "meals", "record_%d.jpg" % r["id"]))
@@ -1515,6 +1703,31 @@ class H(BaseHTTPRequestHandler):
                                         "remaining": summary["remaining"], "eaten": summary["eaten"]})
             # id 无效 → 降级为普通记录
 
+        # 训练路径：写 workouts 表（训练消耗已含在活动系数内，不进饮食额度）
+        if analysis.get("action") == "training":
+            date = datetime.now().strftime("%Y-%m-%d")
+            ids, ek, names = [], 0, []
+            with db() as conn:
+                for it in items:
+                    cur = conn.execute(
+                        "INSERT INTO workouts (user_id,date,action,sets_reps,duration_min,est_kcal,note,created_at)"
+                        " VALUES (?,?,?,?,?,?,?,?)",
+                        (user, date, it.get("action", "训练"), it.get("sets_reps", ""),
+                         it.get("duration_min"), it.get("kcal"), "训练记录",
+                         datetime.now().isoformat(timespec="seconds")))
+                    ids.append(cur.lastrowid)
+                    ek += it.get("kcal") or 0
+                    names.append((it.get("action") or "?") + " " + (it.get("sets_reps") or ""))
+            reply = ("✅ 已记录训练：" + "、".join(n.strip() for n in names) +
+                     "｜预计消耗 ≈" + str(ek) + " 千卡\n"
+                     "💡 消耗已含在每日活动系数中，不从饮食额度扣除")
+            hint = plan_hint(user, date)
+            if hint:
+                reply += "\n" + hint
+            wk = week_workouts(user)
+            reply += "\n🏋️ 本周已练 " + str(len(wk)) + " 次"
+            return self._json(200, {"reply": reply, "ids": ids})
+
         items = [resolve_item(i, user) for i in items]
         ids = insert_meals(user, items)
         summary = today_summary(user)
@@ -1535,6 +1748,7 @@ class H(BaseHTTPRequestHandler):
                     pass
                 return self._json(200, {"ok": True, "msg": "已删除"})
             if action == "edit":
+                old = conn.execute("SELECT user_id,date,food FROM meals WHERE id=?", (rid,)).fetchone()
                 sets, vals = [], []
                 if j.get("food"):
                     sets.append("food=?"); vals.append(str(j["food"]).strip())
@@ -1552,6 +1766,15 @@ class H(BaseHTTPRequestHandler):
                     return self._json(400, {"error": "没有要改的字段"})
                 vals.append(rid)
                 conn.execute("UPDATE meals SET " + ",".join(sets) + " WHERE id=?", vals)
+                # BUG-04：改名时「扣回:xxx」伴生记录跟随（同 _handle_meal correct 分支）
+                if old and j.get("food"):
+                    old_food = old["food"]
+                    new_food = str(j["food"]).strip()
+                    if old_food and new_food and old_food != new_food:
+                        for pfx in ("扣回:", "扣回："):
+                            conn.execute(
+                                "UPDATE meals SET food=? WHERE user_id=? AND date=? AND food=?",
+                                (pfx + new_food, old["user_id"], old["date"], pfx + old_food))
                 img = j.get("image")  # 编辑页可顺手换照片
                 if img:
                     try:
