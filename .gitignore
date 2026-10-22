@@ -14,3 +14,4 @@ __pycache__/
 .venv/
 pc.html
 pc.js
+served.html
