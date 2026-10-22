@@ -1290,7 +1290,9 @@ class H(BaseHTTPRequestHandler):
         p = urlparse(self.path).path
         if p not in ("/api/meal", "/api/correct", "/api/profile", "/api/analyze", "/api/save", "/api/clear", "/api/mockcfg", "/deploy"):
             return self._send(404, "text/plain", b"not found")
-        if not self._authed():
+        if p == "/deploy":
+            pass  # /deploy 有独立的 token 校验（Gitee Webhook 只带 X-Gitee-Token，不过通用门卫）
+        elif not self._authed():
             return self._json(401, {"error": "需要访问码"})
         try:
             length = int(self.headers.get("Content-Length", 0))
