@@ -996,6 +996,7 @@ function openCal(){const b=viewDate||todayStr();calY=+b.slice(0,4);calM=+b.slice
  showBack("calBack");renderCal();}
 $("dLabel").onclick=openCal;
 $("calClose").onclick=()=>hideBack("calBack");
+$("calBack").onclick=e=>{if(e.target.id==="calBack")hideBack("calBack");};
 $("calPrevM").onclick=()=>{calM--;if(calM<1){calM=12;calY--;}
  ensureMonth(calY+"-"+String(calM).padStart(2,"0"));renderCal();};
 $("calNextM").onclick=()=>{calM++;if(calM>12){calM=1;calY++;}
