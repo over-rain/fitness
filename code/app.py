@@ -641,7 +641,8 @@ input[type=text]:focus{border-color:var(--color-primary)}
  display:flex;align-items:center;justify-content:center;margin:0 auto;
  font-size:13px;color:var(--text-secondary);background:var(--color-card-bg)}
 .sday.has .ring{border-color:var(--color-primary);color:var(--text-main);font-weight:600}
-.sday.sel .ring{background:var(--color-primary);border-color:var(--color-primary);color:#fff}
+.sday.tod .ring{background:var(--color-primary-soft)}
+.sday.sel .ring{border-color:var(--color-primary);color:var(--text-main)}
 .sday.sel .swd{color:var(--text-main);font-weight:600}
 .cxlink{color:var(--color-primary);cursor:pointer;text-decoration:underline;margin-left:10px}
 .calnav{display:flex;justify-content:center;gap:28px;margin-bottom:8px}
@@ -757,6 +758,7 @@ button{transition:transform .12s;font-family:var(--font-family)}
  <button class="dlabel" id="dLabel">今天</button>
  <button class="navb" id="dNext">›</button>
 </div>
+<div class="strip" id="strip"></div>
 <div class="card">
  <div class="muted">今日剩余</div>
  <div class="num"><span id="remain">–</span><small>kcal</small></div>
@@ -1048,7 +1050,7 @@ function toast(t){const el=$("toast");el.textContent=t;el.classList.add("show");
  setTimeout(()=>el.classList.remove("show"),2200);}
 const MEAL_ORD={"早餐":0,"午餐":1,"晚餐":2,"加餐":3};
 async function refresh(){
- try{const j=await api("/api/today?user="+user);renderHero(j);}
+ try{const j=await api("/api/today?user="+user+(viewDate?"&date="+viewDate:""));renderHero(j);}
  catch(e){toast("加载失败："+e.message);}
  try{const j=await api("/api/today?user="+user+(viewDate?"&date="+viewDate:""));renderDetail(j);}
  catch(e){toast("明细加载失败："+e.message);}
@@ -1401,13 +1403,14 @@ async function ensureMonth(ym){
 function renderStrip(){
  const el=$("strip");let h="";
  const sel=viewDate||todayStr();
+ const t=todayStr();
  for(let i=6;i>=0;i--){
   const d=new Date();d.setDate(d.getDate()-i);
   const ds=d.toISOString().slice(0,10);
   const wd=["日","一","二","三","四","五","六"][d.getDay()];
   const lbl=i===0?"今":wd;
   const n=(monthDays[ds]||{}).n||0;
-  const selCls=(ds===sel)?" sel":"";
+  const selCls=((ds===sel)?" sel":"")+((ds===t)?" tod":"");
   h+="<div class='sday"+(n>0?" has":"")+selCls+"' data-d='"+ds+"'>"+
    "<div class='swd'>"+lbl+"</div><div class='ring'>"+d.getDate()+"</div></div>";
  }
