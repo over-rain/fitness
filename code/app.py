@@ -404,7 +404,8 @@ def today_summary(user_id, date_str=None):
     return {"user": user_id, "name": tgt["name"], "date": date, "records": rows,
             "eaten": eaten, "protein": protein, "fat": fat, "carb": carb,
             "target": tgt["kcal"], "protein_target": tgt["protein"],
-            "remaining": remaining, "dinner_tip": dinner_tip(rows, remaining)}
+            "remaining": remaining,
+            "dinner_tip": (dinner_tip(rows, remaining) if date == datetime.now().strftime("%Y-%m-%d") else None)}
 
 
 def dinner_tip(rows, remaining):
@@ -751,6 +752,11 @@ button{transition:transform .12s;font-family:var(--font-family)}
   <button class="gear" id="gear" title="身体档案设置">⚙️</button>
   <button class="gear" id="themeBtn" title="切换全局主题">🧊</button>
  </div></div>
+<div class="dchead">
+ <button class="navb" id="dPrev">‹</button>
+ <button class="dlabel" id="dLabel">今天</button>
+ <button class="navb" id="dNext">›</button>
+</div>
 <div class="card">
  <div class="muted">今日剩余</div>
  <div class="num"><span id="remain">–</span><small>kcal</small></div>
@@ -764,13 +770,9 @@ button{transition:transform .12s;font-family:var(--font-family)}
   <button class="send" id="bSend">发送</button></div>
  <input type="file" id="photo" accept="image/*" style="display:none">
  <div id="reply"></div></div>
-<div class="card" id="wkCard"></div>
-<div class="card"><div class="dchead">
- <button class="navb" id="dPrev">‹</button>
- <button class="dlabel" id="dLabel">今天</button>
- <button class="navb" id="dNext">›</button>
- <button id="clearBtn" style="margin-left:auto;border:1px solid var(--color-danger-border);background:var(--color-danger-soft);color:var(--color-danger);font-size:12.5px;font-weight:600;border-radius:var(--radius-tag);padding:6px 14px;cursor:pointer;display:none">清空</button></div>
-<div class="strip" id="strip"></div>
+<div class="card" id="wkCard" style="display:none"></div>
+<div class="card"><div style="display:flex;justify-content:flex-end;margin-bottom:6px">
+ <button id="clearBtn" style="border:1px solid var(--color-danger-border);background:var(--color-danger-soft);color:var(--color-danger);font-size:12.5px;font-weight:600;border-radius:var(--radius-tag);padding:6px 14px;cursor:pointer;display:none">清空</button></div>
 <div id="list"></div></div>
 <div class="mback up" id="calBack" style="display:none">
  <div class="sheet">
@@ -810,7 +812,7 @@ button{transition:transform .12s;font-family:var(--font-family)}
 <div class="mback" id="mback">
  <div class="modal">
   <div class="mhead"><b>设置</b><button id="mclose">✕</button></div>
-  <div class="tabs"><button class="tab on" id="tProfile">👤 个人信息</button><button class="tab" id="tGeneral">⚙️ 通用</button><button class="tab" id="tPlan">🏋️ 训练计划</button></div>
+  <div class="tabs"><button class="tab on" id="tProfile">👤 个人信息</button><button class="tab" id="tGeneral">⚙️ 通用</button><button class="tab" id="tPlan" style="display:none">🏋️ 训练计划</button></div>
   <div class="panel on" id="pProfile">
    <div class="muted" style="margin-bottom:9px">保存后自动按 Mifflin-St Jeor 重算热量线</div>
    <div class="grid">
