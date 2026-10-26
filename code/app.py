@@ -634,7 +634,8 @@ input[type=text]:focus{border-color:var(--color-primary)}
 .dlabel{flex:1;border:1px solid var(--color-card-border);background:var(--color-card-bg);
  border-radius:var(--radius-tag);padding:7px 14px;font-size:13.5px;font-weight:600;
  color:var(--text-main);cursor:pointer;text-align:center}
-.strip{display:flex;gap:6px;overflow-x:auto;padding:2px 0 8px;-webkit-overflow-scrolling:touch}
+.strip{display:flex;gap:6px;overflow-x:auto;padding:2px 0 8px;-webkit-overflow-scrolling:touch;
+ justify-content:space-between}
 .sday{flex:none;width:44px;text-align:center;cursor:pointer}
 .sday .swd{font-size:10.5px;color:var(--text-secondary);margin-bottom:3px}
 .sday .ring{width:38px;height:38px;border-radius:50%;border:2.5px solid var(--color-divider);
@@ -705,6 +706,10 @@ input[type=text]:focus{border-color:var(--color-primary)}
  transition:transform .3s cubic-bezier(.34,1.25,.4,1);
  backdrop-filter:blur(var(--card-backdrop-blur));-webkit-backdrop-filter:blur(var(--card-backdrop-blur))}
 .mback.up.open .sheet{transform:translateY(0)}
+.mback.top{align-items:flex-start;padding:12px 12px 0}
+.mback.top .sheet{border-radius:0 0 var(--radius-lg) var(--radius-lg);transform:translateY(-100%)}
+.mback.top.open .sheet{transform:translateY(0)}
+.mback.top.closing .sheet{transform:translateY(-100%)}
 .etitle{text-align:center;font-size:16px;font-weight:700;margin-bottom:12px;color:var(--text-main)}
 .ehead{display:flex;align-items:center;gap:10px;margin-bottom:6px}
 .ethumb{width:56px;height:56px;border-radius:14px;object-fit:cover;background:var(--bar-track);cursor:pointer}
@@ -776,7 +781,7 @@ button{transition:transform .12s;font-family:var(--font-family)}
 <div class="card"><div style="display:flex;justify-content:flex-end;margin-bottom:6px">
  <button id="clearBtn" style="border:1px solid var(--color-danger-border);background:var(--color-danger-soft);color:var(--color-danger);font-size:12.5px;font-weight:600;border-radius:var(--radius-tag);padding:6px 14px;cursor:pointer;display:none">清空</button></div>
 <div id="list"></div></div>
-<div class="mback up" id="calBack" style="display:none">
+<div class="mback top" id="calBack" style="display:none">
  <div class="sheet">
   <div class="mhead"><b id="calTitle">2026年10月</b><button id="calClose">✕</button></div>
   <div class="calnav"><button id="calPrevM">‹</button><button id="calNextM">›</button></div>
@@ -993,10 +998,11 @@ function setViewDate(ds){if(ds>todayStr())ds=todayStr();
  viewDate=(ds===todayStr())?null:ds;renderDateHead();refresh();}
 let calY=0,calM=0;
 function openCal(){const b=viewDate||todayStr();calY=+b.slice(0,4);calM=+b.slice(5,7);
- showBack("calBack");renderCal();}
+ showBack("calBack");requestAnimationFrame(()=>$("calBack").classList.add("open"));renderCal();}
+function closeCal(){$("calBack").classList.remove("open");hideBack("calBack");}
 $("dLabel").onclick=openCal;
-$("calClose").onclick=()=>hideBack("calBack");
-$("calBack").onclick=e=>{if(e.target.id==="calBack")hideBack("calBack");};
+$("calClose").onclick=closeCal;
+$("calBack").onclick=e=>{if(e.target.id==="calBack")closeCal();};
 $("calPrevM").onclick=()=>{calM--;if(calM<1){calM=12;calY--;}
  ensureMonth(calY+"-"+String(calM).padStart(2,"0"));renderCal();};
 $("calNextM").onclick=()=>{calM++;if(calM>12){calM=1;calY++;}
