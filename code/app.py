@@ -642,7 +642,6 @@ input[type=text]:focus{border-color:var(--color-primary)}
  display:flex;align-items:center;justify-content:center;margin:0 auto;
  font-size:13px;color:var(--text-secondary);background:var(--color-card-bg)}
 .sday.has .ring{border-color:var(--color-primary);color:var(--text-main);font-weight:600}
-.sday.tod .ring{background:var(--color-primary-soft)}
 .sday.sel .ring{border-color:var(--color-primary);color:var(--text-main)}
 .sday.sel .swd{color:var(--text-main);font-weight:600}
 .cxlink{color:var(--color-primary);cursor:pointer;text-decoration:underline;margin-left:10px}
@@ -654,7 +653,7 @@ input[type=text]:focus{border-color:var(--color-primary)}
  display:flex;align-items:center;justify-content:center;margin:0 auto;
  font-size:13px;color:var(--text-secondary);cursor:pointer}
 .cday.has{border-color:var(--color-primary);color:var(--text-main);font-weight:600}
-.cday.sel{background:var(--color-primary);border-color:var(--color-primary);color:#fff}
+.cday.sel{border-color:var(--color-primary);color:var(--color-primary);font-weight:700}
 .cday.dis{opacity:.35;cursor:default}
 .ring-track{stroke:var(--ring-bg)}
 .ring-fill{stroke:var(--ring-progress)}
@@ -707,7 +706,7 @@ input[type=text]:focus{border-color:var(--color-primary)}
  backdrop-filter:blur(var(--card-backdrop-blur));-webkit-backdrop-filter:blur(var(--card-backdrop-blur))}
 .mback.up.open .sheet{transform:translateY(0)}
 .mback.top{align-items:flex-start;padding:12px 12px 0}
-.mback.top .sheet{border-radius:0 0 var(--radius-lg) var(--radius-lg);transform:translateY(-100%)}
+.mback.top .sheet{background:var(--color-solid);border-radius:0 0 var(--radius-lg) var(--radius-lg);transform:translateY(-100%)}
 .mback.top.open .sheet{transform:translateY(0)}
 .mback.top.closing .sheet{transform:translateY(-100%)}
 .etitle{text-align:center;font-size:16px;font-weight:700;margin-bottom:12px;color:var(--text-main)}
@@ -758,11 +757,6 @@ button{transition:transform .12s;font-family:var(--font-family)}
   <button class="gear" id="gear" title="身体档案设置">⚙️</button>
   <button class="gear" id="themeBtn" title="切换全局主题">🧊</button>
  </div></div>
-<div class="dchead">
- <button class="navb" id="dPrev">‹</button>
- <button class="dlabel" id="dLabel">今天</button>
- <button class="navb" id="dNext">›</button>
-</div>
 <div class="strip" id="strip"></div>
 <div class="card">
  <div class="muted">今日剩余</div>
@@ -778,7 +772,8 @@ button{transition:transform .12s;font-family:var(--font-family)}
  <input type="file" id="photo" accept="image/*" style="display:none">
  <div id="reply"></div></div>
 <div class="card" id="wkCard" style="display:none"></div>
-<div class="card"><div style="display:flex;justify-content:flex-end;margin-bottom:6px">
+<div class="card"><div style="display:flex;align-items:center;margin-bottom:6px">
+ <div class="muted" id="dLabel" style="flex:1;cursor:pointer" title="点按选择日期">今天</div>
  <button id="clearBtn" style="border:1px solid var(--color-danger-border);background:var(--color-danger-soft);color:var(--color-danger);font-size:12.5px;font-weight:600;border-radius:var(--radius-tag);padding:6px 14px;cursor:pointer;display:none">清空</button></div>
 <div id="list"></div></div>
 <div class="mback top" id="calBack" style="display:none">
@@ -1026,11 +1021,10 @@ function renderCal(){
  $("calGrid").querySelectorAll(".cday:not(.dis)").forEach(c=>c.onclick=()=>{
   setViewDate(c.dataset.d);hideBack("calBack");});
 }
-function shiftDate(n){setViewDate(dstrShift(viewDate||todayStr(),n));}
 function renderDateHead(){
  $("dLabel").textContent=labelFor(viewDate||todayStr());
- $("dNext").style.visibility=viewDate?"visible":"hidden";
  $("clearBtn").style.display=viewDate?"none":"";}
+$("dLabel").onclick=openCal;
 const photoUrls={};
 async function loadThumb(id,img,uid){
  try{const r=await fetch("/photo/"+id+(uid?"?user="+uid:""),TOKEN?{headers:{"X-Access-Token":TOKEN}}:{});
@@ -1410,16 +1404,14 @@ async function ensureMonth(ym){
 function renderStrip(){
  const el=$("strip");let h="";
  const sel=viewDate||todayStr();
- const t=todayStr();
  for(let i=6;i>=0;i--){
   const d=new Date();d.setDate(d.getDate()-i);
   const ds=d.toISOString().slice(0,10);
   const wd=["日","一","二","三","四","五","六"][d.getDay()];
-  const lbl=i===0?"今":wd;
   const n=(monthDays[ds]||{}).n||0;
-  const selCls=((ds===sel)?" sel":"")+((ds===t)?" tod":"");
+  const selCls=(ds===sel)?" sel":"";
   h+="<div class='sday"+(n>0?" has":"")+selCls+"' data-d='"+ds+"'>"+
-   "<div class='swd'>"+lbl+"</div><div class='ring'>"+d.getDate()+"</div></div>";
+   "<div class='swd'>"+wd+"</div><div class='ring'>"+d.getDate()+"</div></div>";
  }
  el.innerHTML=h;
  el.querySelectorAll(".sday").forEach(sd=>sd.onclick=()=>setViewDate(sd.dataset.d));
