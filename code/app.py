@@ -772,8 +772,8 @@ button{transition:transform .12s;font-family:var(--font-family)}
  <input type="file" id="photo" accept="image/*" style="display:none">
  <div id="reply"></div></div>
 <div class="card" id="wkCard" style="display:none"></div>
-<div class="card"><div style="display:flex;align-items:center;margin-bottom:6px">
- <div class="muted" id="dLabel" style="flex:1;cursor:pointer" title="点按选择日期">今天</div>
+<div class="card"><div class="dchead">
+ <button class="dlabel" id="dLabel">今天 ▾</button>
  <button id="clearBtn" style="border:1px solid var(--color-danger-border);background:var(--color-danger-soft);color:var(--color-danger);font-size:12.5px;font-weight:600;border-radius:var(--radius-tag);padding:6px 14px;cursor:pointer;display:none">清空</button></div>
 <div id="list"></div></div>
 <div class="mback top" id="calBack" style="display:none">
@@ -1022,7 +1022,7 @@ function renderCal(){
   setViewDate(c.dataset.d);hideBack("calBack");});
 }
 function renderDateHead(){
- $("dLabel").textContent=labelFor(viewDate||todayStr());
+ $("dLabel").textContent=labelFor(viewDate||todayStr())+" ▾";
  $("clearBtn").style.display=viewDate?"none":"";}
 $("dLabel").onclick=openCal;
 const photoUrls={};
