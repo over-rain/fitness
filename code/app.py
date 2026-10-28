@@ -442,14 +442,15 @@ def build_card(items, summary, verb="记录"):
 
 INDEX = r"""<!doctype html><html lang="zh"><head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <meta name="theme-color" content="#E6F6E9">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <title>减肥管家</title>
 <style>
 /* ===== ① Base 设计令牌（home/meal 共用，禁止修改）===== */
 :root{
- --radius-lg:24px;--radius-tag:999px;--radius-btn:16px;--radius-img:16px;
+ --radius-lg:14px;--radius-xl:16px;--radius-tag:999px;--radius-btn:16px;--radius-img:16px;
+ --dur-fast:240ms;--dur-base:260ms;--ease-out:cubic-bezier(.25,.46,.45,.94);
  --padding-card-normal:24px;--padding-card-image:8px;--gap-card:16px;
  --card-backdrop-blur:12px;
  --font-family:system-ui,-apple-system,"PingFang SC",sans-serif;
@@ -468,7 +469,7 @@ INDEX = r"""<!doctype html><html lang="zh"><head>
  --color-card-border:rgba(255,255,255,0.85);
  --color-primary:#57C374;
  --color-primary-soft:rgba(87,195,116,0.15);
- --text-main:#1A3A26;--text-secondary:#4A6B56;
+ --text-main:#1A3A26;--text-secondary:#4A6B56;--text-placeholder:rgba(26,58,38,.42);
  --progress-bar:#57C374;
  --shadow-card:0 4px 16px rgba(160,200,170,0.15),0 1px 4px rgba(160,200,170,0.08);
  --color-divider:rgba(160,200,170,0.3);
@@ -482,7 +483,7 @@ INDEX = r"""<!doctype html><html lang="zh"><head>
  --color-card-border:rgba(255,255,255,0.85);
  --color-primary:#3B88ED;
  --color-primary-soft:rgba(59,136,237,0.15);
- --text-main:#1A3050;--text-secondary:#546278;
+ --text-main:#1A3050;--text-secondary:#546278;--text-placeholder:rgba(26,48,80,.42);
  --progress-bar:#3B88ED;
  --shadow-card:0 4px 16px rgba(150,180,220,0.15),0 1px 4px rgba(150,180,220,0.08);
  --color-divider:rgba(180,205,235,0.3);
@@ -491,7 +492,8 @@ INDEX = r"""<!doctype html><html lang="zh"><head>
 }
 /* ===== 基础 ===== */
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-body{font-family:var(--font-family);margin:0;color:var(--text-main)}
+body{font-family:var(--font-family);margin:0;color:var(--text-main);touch-action:manipulation}
+input::placeholder,textarea::placeholder{color:var(--text-placeholder)}
 .view{min-height:100vh;background:var(--color-page-bg-gradient,var(--color-page-bg));color:var(--text-main)}
 #homeView{max-width:430px;margin:0 auto;padding:14px 12px 30px}
 #homeView .card{margin-bottom:var(--gap-card)}
@@ -528,7 +530,7 @@ body{font-family:var(--font-family);margin:0;color:var(--text-main)}
 .num.over{color:var(--color-danger)}
 .num small{font-size:var(--font-size-small);color:var(--text-secondary);font-weight:400;margin-left:3px}
 .bar{height:9px;background:var(--bar-track);border-radius:99px;overflow:hidden}
-.bar i{display:block;height:100%;width:0;border-radius:99px;background:var(--progress-bar);transition:width .5s}
+.bar i{display:block;height:100%;width:0;border-radius:99px;background:var(--progress-bar);transition:width .3s var(--ease-out)}
 .bar.warn i{background:var(--color-warn)}
 .sumline{margin-top:9px;font-size:12.5px;color:var(--text-secondary)}
 .dinnerline{display:none;margin-top:9px;padding-top:8px;border-top:1px dashed var(--color-divider);
@@ -628,9 +630,7 @@ input[type=text]:focus{border-color:var(--color-primary)}
  color:var(--text-main);font-size:12.5px}
 .calcbox .caltotal b{color:var(--color-primary)}
 .warnred{color:var(--color-danger);font-weight:600}
-.dchead{display:flex;align-items:center;gap:8px;margin-bottom:8px}
-.navb{border:1px solid var(--color-card-border);background:var(--color-card-bg);color:var(--text-main);
- border-radius:10px;width:30px;height:30px;font-size:15px;cursor:pointer}
+.dchead{display:flex;align-items:center;justify-content:center;margin:0 2px 10px}
 .dlabel{flex:1;border:1px solid var(--color-card-border);background:var(--color-card-bg);
  border-radius:var(--radius-tag);padding:7px 14px;font-size:13.5px;font-weight:600;
  color:var(--text-main);cursor:pointer;text-align:center}
@@ -645,16 +645,45 @@ input[type=text]:focus{border-color:var(--color-primary)}
 .sday.sel .ring{border-color:var(--color-primary);color:var(--text-main)}
 .sday.sel .swd{color:var(--text-main);font-weight:600}
 .cxlink{color:var(--color-primary);cursor:pointer;text-decoration:underline;margin-left:10px}
-.calnav{display:flex;justify-content:center;gap:28px;margin-bottom:8px}
-.calnav button{border:0;background:none;font-size:16px;color:var(--text-secondary);cursor:pointer}
-.calwd,.calgrid{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;text-align:center}
-.calwd span{font-size:11px;color:var(--text-secondary)}
-.cday{width:38px;height:38px;border-radius:50%;border:2.5px solid var(--ring-bg);
- display:flex;align-items:center;justify-content:center;margin:0 auto;
- font-size:13px;color:var(--text-secondary);cursor:pointer}
-.cday.has{border-color:var(--color-primary);color:var(--text-main);font-weight:600}
-.cday.sel{border-color:var(--color-primary);color:var(--color-primary);font-weight:700}
-.cday.dis{opacity:.35;cursor:default}
+/* 日历sheet：手机100vw撑满（桌面收进430px居中）；高度由内容自适应、整月全显示不滚动；
+   顶部无圆角（贴视口顶），底部左右圆角 */
+.mback.top .sheet.cal{position:relative;width:100vw;max-width:430px;margin:0 auto;
+ padding:10px 10px calc(14px + env(safe-area-inset-bottom));
+ border-radius:0 0 var(--radius-xl) var(--radius-xl)}
+.calx{position:absolute;top:8px;right:8px;border:0;background:none;font-size:18px;
+ color:var(--text-secondary);cursor:pointer;width:44px;height:44px;line-height:1}
+.calnav{display:flex;align-items:center;justify-content:center;gap:26px;margin:2px 0 14px}
+.calnav .navarrow{flex:none;width:44px;height:44px;border:0;background:none;font-size:22px;
+ line-height:1;color:var(--text-main);cursor:pointer}
+.calnav b{flex:none;font-size:19px;font-weight:700;color:var(--text-main)}
+.calwd{display:grid;grid-template-columns:repeat(7,1fr);text-align:center;margin-bottom:8px}
+.calwd span{font-size:12px;color:var(--text-secondary)}
+.calgrid{display:grid;grid-template-columns:repeat(7,1fr);row-gap:6px}
+.calcell{display:flex;justify-content:center;padding:2px}
+/* 日期cell：最小44px热区（iOS规范）；按压scale(.94) 240ms ease-out。
+   默认态=深色清晰数字无圈（一眼可知可点），只有特殊态才上样式 */
+.cday{width:100%;min-width:44px;max-width:56px;aspect-ratio:1;border-radius:50%;
+ border:2.5px solid transparent;display:flex;align-items:center;justify-content:center;
+ font-size:17px;color:var(--text-main);font-weight:600;cursor:pointer;background:transparent;
+ transition:transform var(--dur-fast) var(--ease-out),background var(--dur-fast) var(--ease-out)}
+.cday:active{transform:scale(.94)}
+@media(hover:hover){.cday:hover{background:var(--color-primary-soft)}}
+/* 状态严格区分：有记录=主色描边；选中=描边+浅主色底；今天=实心主色白字；
+   未来/溢出=浅灰禁用，pointer-events:none 禁一切交互响应 */
+.cday.has{border-color:var(--color-primary)}
+.cday.sel{border-color:var(--color-primary);background:var(--color-primary-soft);
+ color:var(--color-primary);font-weight:700}
+.cday.today{background:var(--color-primary);border-color:var(--color-primary);
+ color:#fff;font-weight:700}
+.cday.dis,.cday.out{color:var(--text-secondary);font-weight:400;opacity:.4;
+ pointer-events:none;cursor:default}
+.callegend{display:flex;align-items:center;gap:14px;margin-top:10px;
+ padding-top:10px;border-top:1px dashed var(--color-divider)}
+.callegend .lg{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;color:var(--text-secondary)}
+.lg-ring{width:13px;height:13px;border-radius:50%;border:2px solid var(--color-primary);box-sizing:border-box}
+.lg-dot{width:13px;height:13px;border-radius:50%;background:var(--color-primary)}
+.caltoday{margin-left:auto;border:0;background:var(--color-primary-soft);color:var(--color-primary);
+ font-size:12.5px;font-weight:600;border-radius:var(--radius-tag);padding:7px 13px;cursor:pointer}
 .ring-track{stroke:var(--ring-bg)}
 .ring-fill{stroke:var(--ring-progress)}
 #avKcal{padding:16px 20px}
@@ -676,17 +705,17 @@ input[type=text]:focus{border-color:var(--color-primary)}
 /* ===== 弹层（遮罩/模态/抽屉）===== */
 .mback{position:fixed;inset:0;background:rgba(15,23,32,.45);display:none;align-items:flex-start;
  justify-content:center;padding:36px 12px;z-index:50;overflow-y:auto;
- -webkit-overflow-scrolling:touch;animation:fadeIn .22s}
+ -webkit-overflow-scrolling:touch;animation:fadeIn var(--dur-base) var(--ease-out)}
 .mback.up{align-items:flex-end;padding:0}
-.mback.closing{animation:fadeOut .22s forwards}
+.mback.closing{animation:fadeOut var(--dur-base) var(--ease-out) forwards}
 .modal{background:var(--color-card-bg);border:1px solid var(--color-card-border);border-radius:var(--radius-lg);
  max-width:430px;width:100%;padding:16px;box-shadow:var(--shadow-card);
  backdrop-filter:blur(var(--card-backdrop-blur));-webkit-backdrop-filter:blur(var(--card-backdrop-blur));
- animation:popIn .24s cubic-bezier(.2,.8,.2,1)}
+ animation:popIn var(--dur-base) var(--ease-out)}
 .mhead{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
 .mhead b{font-size:16px;color:var(--text-main)}
-.mhead button{border:0;background:var(--bar-track);border-radius:8px;width:30px;height:30px;
- font-size:14px;color:var(--text-secondary)}
+.mhead button{border:0;background:var(--bar-track);border-radius:12px;width:36px;height:36px;
+ font-size:15px;color:var(--text-secondary)}
 .tabs{display:flex;gap:6px;margin-bottom:14px}
 .tabs button{flex:1;padding:9px;border:1px solid var(--color-card-border);background:var(--color-card-bg);
  border-radius:10px;font-size:14px;color:var(--text-secondary)}
@@ -702,10 +731,10 @@ input[type=text]:focus{border-color:var(--color-primary)}
 .mback.up .sheet{background:var(--color-card-bg);border:1px solid var(--color-card-border);
  border-radius:var(--radius-lg) var(--radius-lg) 0 0;max-width:430px;width:100%;
  padding:16px 16px calc(16px + env(safe-area-inset-bottom));transform:translateY(100%);
- transition:transform .3s cubic-bezier(.34,1.25,.4,1);
+ transition:transform var(--dur-base) var(--ease-out);
  backdrop-filter:blur(var(--card-backdrop-blur));-webkit-backdrop-filter:blur(var(--card-backdrop-blur))}
 .mback.up.open .sheet{transform:translateY(0)}
-.mback.top{align-items:flex-start;padding:12px 12px 0}
+.mback.top{align-items:flex-start;padding:0}
 .mback.top .sheet{background:var(--color-solid);border-radius:0 0 var(--radius-lg) var(--radius-lg);transform:translateY(-100%)}
 .mback.top.open .sheet{transform:translateY(0)}
 .mback.top.closing .sheet{transform:translateY(-100%)}
@@ -746,7 +775,11 @@ button{transition:transform .12s;font-family:var(--font-family)}
  *,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}
 }
 .btnrow button:active,.pills button:active,.seg button:active,.save:active,.ebtns button:active,
- #avSave:active,#avFix:active,.gear:active,.delzone2:active{transform:scale(.95)}
+ #avSave:active,#avFix:active,.gear:active,.delzone2:active{transform:scale(.95);opacity:.85}
+/* 骨架屏：shimmer 用 track/solid token，1.4s 无限循环 */
+.skel{background:linear-gradient(90deg,var(--bar-track) 25%,var(--color-solid) 50%,var(--bar-track) 75%);
+ background-size:200% 100%;animation:shimmer 1.4s linear infinite;border-radius:8px}
+@keyframes shimmer{to{background-position:-200% 0}}
 #av,.mback{-webkit-overflow-scrolling:touch}
 #av{animation:fadeIn .2s}
 </style></head><body>
@@ -757,6 +790,9 @@ button{transition:transform .12s;font-family:var(--font-family)}
   <button class="gear" id="gear" title="身体档案设置">⚙️</button>
   <button class="gear" id="themeBtn" title="切换全局主题">🧊</button>
  </div></div>
+<div class="dchead">
+ <button class="dlabel" id="dLabel">今天</button>
+</div>
 <div class="strip" id="strip"></div>
 <div class="card">
  <div class="muted">今日剩余</div>
@@ -772,17 +808,20 @@ button{transition:transform .12s;font-family:var(--font-family)}
  <input type="file" id="photo" accept="image/*" style="display:none">
  <div id="reply"></div></div>
 <div class="card" id="wkCard" style="display:none"></div>
-<div class="card"><div class="dchead">
- <button class="dlabel" id="dLabel">今天 ▾</button>
+<div class="card"><div style="display:flex;justify-content:flex-end;margin-bottom:6px">
  <button id="clearBtn" style="border:1px solid var(--color-danger-border);background:var(--color-danger-soft);color:var(--color-danger);font-size:12.5px;font-weight:600;border-radius:var(--radius-tag);padding:6px 14px;cursor:pointer;display:none">清空</button></div>
 <div id="list"></div></div>
 <div class="mback top" id="calBack" style="display:none">
- <div class="sheet">
-  <div class="mhead"><b id="calTitle">2026年10月</b><button id="calClose">✕</button></div>
-  <div class="calnav"><button id="calPrevM">‹</button><button id="calNextM">›</button></div>
+ <div class="sheet cal">
+  <button id="calClose" class="calx" aria-label="关闭">✕</button>
+  <div class="calnav">
+   <button id="calPrevM" class="navarrow" aria-label="上个月">‹</button>
+   <b id="calTitle">2026年10月</b>
+   <button id="calNextM" class="navarrow" aria-label="下个月">›</button>
+  </div>
   <div class="calwd"><span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span><span>日</span></div>
   <div class="calgrid" id="calGrid"></div>
-  <div class="muted" style="text-align:center;font-size:11px;margin-top:6px">圈 = 当天有记录 · 灰色 = 未来</div>
+  <div class="callegend"><span class="lg"><span class="lg-dot"></span>今天</span><span class="lg"><span class="lg-ring"></span>已有记录</span><button id="calToday" class="caltoday">回到今天</button></div>
  </div></div>
 <div class="mback up" id="editBack" style="display:none">
  <div class="sheet">
@@ -881,14 +920,33 @@ window.onerror=function(m){try{toast("页面错误:"+m);}catch(_){}};
 let user=localStorage.getItem("fg_user")||"beifeng";
 function paintSeg(){$("u1").classList.toggle("on",user==="beifeng");$("u2").classList.toggle("on",user==="gagayouna");}
 $("u1").textContent="🧑 邶风";$("u2").textContent="👩 gagayouna";
-$("u1").onclick=()=>{user="beifeng";localStorage.setItem("fg_user",user);paintSeg();clearReply();refresh();if($("mback").style.display==="flex")loadProfile();};
-$("u2").onclick=()=>{user="gagayouna";localStorage.setItem("fg_user",user);paintSeg();clearReply();refresh();if($("mback").style.display==="flex")loadProfile();};
+$("u1").onclick=()=>{user="beifeng";localStorage.setItem("fg_user",user);paintSeg();clearReply();$("list").removeAttribute("data-ready");refresh();if($("mback").style.display==="flex")loadProfile();};
+$("u2").onclick=()=>{user="gagayouna";localStorage.setItem("fg_user",user);paintSeg();clearReply();$("list").removeAttribute("data-ready");refresh();if($("mback").style.display==="flex")loadProfile();};
 function clearReply(){const el=$("reply");el.className="";el.textContent="";
  if(timer)clearInterval(timer);timer=null;suppress=true;busy=false;
  $("bPhoto").disabled=false;$("bSend").disabled=false;}
 function showBack(id){const el=$(id);el.style.display="flex";el.classList.remove("closing");}
 function hideBack(id){const el=$(id);el.classList.add("closing");
- setTimeout(()=>{el.style.display="none";el.classList.remove("closing");},240);}
+ setTimeout(()=>{el.style.display="none";el.classList.remove("closing");},260);}
+// iOS手势关闭：dir=1 底部抽屉下拉关闭；dir=-1 顶部sheet上推关闭（对齐iOS下拉面板惯例）。
+// 拖拽>90px 松手关闭，否则回弹；dir=-1 时内容滚到顶才响应，避免与内部滚动冲突
+function enableDragClose(sheet,back,onClose,dir){
+ let sy=0,d=0,drag=false;
+ sheet.addEventListener("touchstart",e=>{
+  if(back.style.display!=="flex"||back.classList.contains("closing"))return;
+  sy=e.touches[0].clientY;d=0;drag=true;sheet.style.transition="none";},{passive:true});
+ sheet.addEventListener("touchmove",e=>{
+  if(!drag)return;
+  if(dir<0&&sheet.scrollTop>2)return; // 内部还在滚动 → 不触发手势
+  d=(e.touches[0].clientY-sy)*dir;
+  if(d>0)sheet.style.transform="translateY("+(d*dir)+"px)";},{passive:true});
+ sheet.addEventListener("touchend",()=>{
+  if(!drag)return;drag=false;sheet.style.transition="";
+  if(d>90){sheet.style.transform="";onClose();}
+  else sheet.style.transform="";},{passive:true});
+}
+enableDragClose($("editBack").querySelector(".sheet"),$("editBack"),closeEdit,1);
+enableDragClose($("calBack").querySelector(".sheet"),$("calBack"),closeCal,-1);
 function applyTheme(t){document.querySelectorAll("[data-theme]").forEach(v=>v.setAttribute("data-theme",t));
  $("themeBtn").textContent=t==="meal"?"🌿":"🧊";localStorage.setItem("fg_theme",t);}
 $("themeBtn").onclick=()=>applyTheme(localStorage.getItem("fg_theme")==="meal"?"home":"meal");
@@ -1002,24 +1060,32 @@ $("calPrevM").onclick=()=>{calM--;if(calM<1){calM=12;calY--;}
  ensureMonth(calY+"-"+String(calM).padStart(2,"0"));renderCal();};
 $("calNextM").onclick=()=>{calM++;if(calM>12){calM=1;calY++;}
  ensureMonth(calY+"-"+String(calM).padStart(2,"0"));renderCal();};
+$("calToday").onclick=()=>{const td=todayStr();
+ setViewDate(td);calY=+td.slice(0,4);calM=+td.slice(5,7);
+ ensureMonth(td.slice(0,7));renderCal();closeCal();};
 function renderCal(){
  $("calTitle").textContent=calY+"年"+calM+"月";
  const first=new Date(calY,calM-1,1);
  let lead=first.getDay()-1;if(lead<0)lead=6;
  const dim=new Date(calY,calM,0).getDate();
+ const prevDim=new Date(calY,calM-1,0).getDate();
  const t=todayStr();const sel=viewDate||todayStr();
  let h="";
- for(let i=0;i<lead;i++)h+="<span></span>";
+ for(let i=0;i<lead;i++) // 上月溢出日期：浅灰弱化、不可点
+  h+="<div class='calcell'><div class='cday out'>"+(prevDim-lead+1+i)+"</div></div>";
  for(let d=1;d<=dim;d++){
   const ds=calY+"-"+String(calM).padStart(2,"0")+"-"+String(d).padStart(2,"0");
   const future=ds>t;
   const has=(monthDays[ds]||{}).n>0;
-  const cls="cday"+(has?" has":"")+(future?" dis":"")+(ds===sel?" sel":"");
-  h+="<div class='"+cls+"' data-d='"+ds+"'>"+d+"</div>";
+  const cls="cday"+(has?" has":"")+(future?" dis":"")+(ds===sel?" sel":"")+(ds===t?" today":"");
+  h+="<div class='calcell'><div class='"+cls+"' data-d='"+ds+"'>"+d+"</div></div>";
  }
+ const trail=(7-(lead+dim)%7)%7;
+ for(let i=1;i<=trail;i++) // 下月溢出补满整周
+  h+="<div class='calcell'><div class='cday out'>"+i+"</div></div>";
  $("calGrid").innerHTML=h;
- $("calGrid").querySelectorAll(".cday:not(.dis)").forEach(c=>c.onclick=()=>{
-  setViewDate(c.dataset.d);hideBack("calBack");});
+ $("calGrid").querySelectorAll(".cday:not(.dis):not(.out)").forEach(c=>c.onclick=()=>{
+  setViewDate(c.dataset.d);hideBack("calBack");}); // 选中历史日期→加载当日记录并关闭
 }
 function renderDateHead(){
  $("dLabel").textContent=labelFor(viewDate||todayStr())+" ▾";
@@ -1050,10 +1116,20 @@ function showErr(t){done();if(suppress)return;const el=$("reply");el.className="
 function toast(t){const el=$("toast");el.textContent=t;el.classList.add("show");
  setTimeout(()=>el.classList.remove("show"),2200);}
 const MEAL_ORD={"早餐":0,"午餐":1,"晚餐":2,"加餐":3};
+function listSkeleton(){ // 明细卡骨架屏：首屏/切用户时替代转圈，数据到后整体覆盖
+ const row="<div style='display:flex;align-items:center;gap:10px;padding:8px'>"+
+  "<div class='skel' style='width:48px;height:48px;border-radius:12px;flex:none'></div>"+
+  "<div style='flex:1'><div class='skel' style='height:14px;width:60%;margin-bottom:8px'></div>"+
+  "<div class='skel' style='height:11px;width:35%'></div></div>"+
+  "<div class='skel' style='width:44px;height:13px'></div></div>";
+ const card="<div class='card gcard'><div class='skel' style='height:16px;width:38%;margin-bottom:10px'></div>"+row+row+"</div>";
+ $("list").innerHTML=card+card;
+}
 async function refresh(){
+ if(!$("list").dataset.ready)listSkeleton();
  try{const j=await api("/api/today?user="+user+(viewDate?"&date="+viewDate:""));renderHero(j);}
  catch(e){toast("加载失败："+e.message);}
- try{const j=await api("/api/today?user="+user+(viewDate?"&date="+viewDate:""));renderDetail(j);}
+ try{const j=await api("/api/today?user="+user+(viewDate?"&date="+viewDate:""));renderDetail(j);$("list").dataset.ready=1;}
  catch(e){toast("明细加载失败："+e.message);}
  try{const pl=await api("/api/plan?user="+user);
   const w=await api("/api/workouts?user="+user);
@@ -1061,8 +1137,15 @@ async function refresh(){
  }catch(e){}
  await ensureMonth(todayStr());renderStrip();renderDateHead();
 }
+function countUp(el,to){ // 剩余热量数字平滑过渡：300ms ease-out（rAF三次缓出），避免数值跳变
+ const from=parseInt(el.textContent,10)||0;if(from===to){el.textContent=to;return;}
+ const t0=performance.now(),dur=300;
+ const step=t=>{const p=Math.min(1,(t-t0)/dur),e=1-Math.pow(1-p,3);
+  el.textContent=Math.round(from+(to-from)*e);
+  if(p<1)requestAnimationFrame(step);};
+ requestAnimationFrame(step);}
 function renderHero(j){
- $("remain").textContent=j.remaining;
+ countUp($("remain"),j.remaining);
  $("remain").classList.toggle("over",j.remaining<0);
  const pct=Math.max(0,Math.min(100,j.target?j.eaten/j.target*100:0));
  const bar=$("bar");bar.classList.toggle("warn",pct>85);
