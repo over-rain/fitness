@@ -1736,8 +1736,9 @@ class H(BaseHTTPRequestHandler):
                 if not tok or not hmac.compare_digest(supplied, tok):
                     return self._json(401, {"error": "token 不匹配"})
                 ev = self.headers.get("X-Gitee-Event") or ""
-                if ev and ev != "tag_push":
-                    return self._json(200, {"ok": True, "msg": "非 tag 事件，跳过部署"})
+                # Gitee 事件头实际值带 Hook 后缀（Tag Push Hook）；兼容旧式 tag_push
+                if ev and "tag push" not in ev.lower() and ev != "tag_push":
+                    return self._json(200, {"ok": True, "msg": "非 tag 事件，跳过部署", "event": ev})
                 self._trigger_deploy()
                 self._json(200, {"ok": True, "msg": "部署已触发"})
         except ApiError as ex:
