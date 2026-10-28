@@ -370,8 +370,16 @@ def resolve_item(item, user_id):
 
 # ---------------------------------------------------------------- 业务
 
-def insert_meals(user_id, items):
-    date = datetime.now().strftime("%Y-%m-%d")
+def valid_date(ds):
+    """前端传入的记录日期：格式合法且不晚于今天才收，否则回落今天（防未来日期/脏数据）"""
+    today = datetime.now().strftime("%Y-%m-%d")
+    if ds and re.match(r"^\d{4}-\d{2}-\d{2}$", ds) and ds <= today:
+        return ds
+    return today
+
+
+def insert_meals(user_id, items, date=None):
+    date = valid_date(date)
     meal_type = infer_meal_type()
     ids = []
     with db() as conn:
@@ -433,8 +441,9 @@ def build_card(items, summary, verb="记录"):
     names = "、".join(i.get("food", "?") + (i.get("portion", "")) for i in items)
     mid = sum(i.get("kcal") or 0 for i in items)
     meal_type = items[0].get("meal_type") or infer_meal_type()
+    day = "今日" if summary["date"] == datetime.now().strftime("%Y-%m-%d") else summary["date"][5:] + " 当天"
     return (f"✅ 已{verb}{meal_type}：{names}，约{mid}kcal（区间{low}~{high}）｜蛋白{protein}g\n"
-            f"📊 {summary['name']}今日已吃 {summary['eaten']}/{summary['target']} kcal｜"
+            f"📊 {summary['name']}{day}已吃 {summary['eaten']}/{summary['target']} kcal｜"
             f"蛋白 {summary['protein']}/{summary['protein_target']}g\n"
             f"🔜 剩余 {summary['remaining']} kcal")
 
@@ -450,7 +459,7 @@ INDEX = r"""<!doctype html><html lang="zh"><head>
 /* ===== ① Base 设计令牌（home/meal 共用，禁止修改）===== */
 :root{
  --radius-lg:14px;--radius-xl:16px;--radius-tag:999px;--radius-btn:16px;--radius-img:16px;
- --dur-fast:240ms;--dur-base:260ms;--ease-out:cubic-bezier(.25,.46,.45,.94);
+ --dur-fast:240ms;--dur-base:260ms;--dur-press:100ms;--ease-out:cubic-bezier(.25,.46,.45,.94);
  --padding-card-normal:24px;--padding-card-image:8px;--gap-card:16px;
  --card-backdrop-blur:12px;
  --font-family:system-ui,-apple-system,"PingFang SC",sans-serif;
@@ -638,11 +647,11 @@ input[type=text]:focus{border-color:var(--color-primary)}
  justify-content:space-between}
 .sday{flex:none;width:44px;text-align:center;cursor:pointer}
 .sday .swd{font-size:10.5px;color:var(--text-secondary);margin-bottom:3px}
-.sday .ring{width:38px;height:38px;border-radius:50%;border:2.5px solid var(--color-divider);
+.sday .ring{position:relative;width:38px;height:38px;border-radius:50%;border:2.5px solid var(--color-divider);
  display:flex;align-items:center;justify-content:center;margin:0 auto;
  font-size:13px;color:var(--text-secondary);background:var(--color-card-bg)}
-.sday.has .ring{border-color:var(--color-primary);color:var(--text-main);font-weight:600}
-.sday.sel .ring{border-color:var(--color-primary);color:var(--text-main)}
+.sday.has .ring{border-color:transparent;color:var(--text-main);font-weight:600}
+.sday.sel .ring{color:var(--color-primary);font-weight:700}
 .sday.sel .swd{color:var(--text-main);font-weight:600}
 .cxlink{color:var(--color-primary);cursor:pointer;text-decoration:underline;margin-left:10px}
 /* 日历sheet：手机100vw撑满（桌面收进430px居中）；高度由内容自适应、整月全显示不滚动；
@@ -662,19 +671,20 @@ input[type=text]:focus{border-color:var(--color-primary)}
 .calcell{display:flex;justify-content:center;padding:2px}
 /* 日期cell：最小44px热区（iOS规范）；按压scale(.94) 240ms ease-out。
    默认态=深色清晰数字无圈（一眼可知可点），只有特殊态才上样式 */
-.cday{width:100%;min-width:44px;max-width:56px;aspect-ratio:1;border-radius:50%;
+.cday{position:relative;width:100%;min-width:44px;max-width:56px;aspect-ratio:1;border-radius:50%;
  border:2.5px solid transparent;display:flex;align-items:center;justify-content:center;
  font-size:17px;color:var(--text-main);font-weight:600;cursor:pointer;background:transparent;
- transition:transform var(--dur-fast) var(--ease-out),background var(--dur-fast) var(--ease-out)}
+ transition:transform var(--dur-press) var(--ease-out),background var(--dur-fast) var(--ease-out)}
 .cday:active{transform:scale(.94)}
 @media(hover:hover){.cday:hover{background:var(--color-primary-soft)}}
 /* 状态严格区分：有记录=主色描边；选中=描边+浅主色底；今天=实心主色白字；
    未来/溢出=浅灰禁用，pointer-events:none 禁一切交互响应 */
-.cday.has{border-color:var(--color-primary)}
-.cday.sel{border-color:var(--color-primary);background:var(--color-primary-soft);
+/* 有记录=进度环（SVG叠加）；选中=浅主色底与环共存；今天=数字下小绿点 */
+.cring{position:absolute;inset:0;width:100%;height:100%}
+.cday.sel{background:var(--color-primary-soft);
  color:var(--color-primary);font-weight:700}
-.cday.today{background:var(--color-primary);border-color:var(--color-primary);
- color:#fff;font-weight:700}
+.cday.today::after{content:"";position:absolute;bottom:3px;left:50%;transform:translateX(-50%);
+ width:4px;height:4px;border-radius:50%;background:var(--color-primary)}
 .cday.dis,.cday.out{color:var(--text-secondary);font-weight:400;opacity:.4;
  pointer-events:none;cursor:default}
 .callegend{display:flex;align-items:center;gap:14px;margin-top:10px;
@@ -685,7 +695,7 @@ input[type=text]:focus{border-color:var(--color-primary)}
 .caltoday{margin-left:auto;border:0;background:var(--color-primary-soft);color:var(--color-primary);
  font-size:12.5px;font-weight:600;border-radius:var(--radius-tag);padding:7px 13px;cursor:pointer}
 .ring-track{stroke:var(--ring-bg)}
-.ring-fill{stroke:var(--ring-progress)}
+.ring-fill{stroke:var(--ring-progress);transition:stroke-dashoffset var(--dur-base) var(--ease-out)}
 #avKcal{padding:16px 20px}
 .avitem{padding:10px 2px;border-bottom:1px solid var(--color-divider);
  display:flex;justify-content:space-between;gap:8px;align-items:baseline}
@@ -920,8 +930,8 @@ window.onerror=function(m){try{toast("页面错误:"+m);}catch(_){}};
 let user=localStorage.getItem("fg_user")||"beifeng";
 function paintSeg(){$("u1").classList.toggle("on",user==="beifeng");$("u2").classList.toggle("on",user==="gagayouna");}
 $("u1").textContent="🧑 邶风";$("u2").textContent="👩 gagayouna";
-$("u1").onclick=()=>{user="beifeng";localStorage.setItem("fg_user",user);paintSeg();clearReply();$("list").removeAttribute("data-ready");refresh();if($("mback").style.display==="flex")loadProfile();};
-$("u2").onclick=()=>{user="gagayouna";localStorage.setItem("fg_user",user);paintSeg();clearReply();$("list").removeAttribute("data-ready");refresh();if($("mback").style.display==="flex")loadProfile();};
+$("u1").onclick=()=>{user="beifeng";localStorage.setItem("fg_user",user);paintSeg();clearReply();$("list").removeAttribute("data-ready");monthDays={};monthFetched={};CAL_TARGET=0;refresh();if($("mback").style.display==="flex")loadProfile();};
+$("u2").onclick=()=>{user="gagayouna";localStorage.setItem("fg_user",user);paintSeg();clearReply();$("list").removeAttribute("data-ready");monthDays={};monthFetched={};CAL_TARGET=0;refresh();if($("mback").style.display==="flex")loadProfile();};
 function clearReply(){const el=$("reply");el.className="";el.textContent="";
  if(timer)clearInterval(timer);timer=null;suppress=true;busy=false;
  $("bPhoto").disabled=false;$("bSend").disabled=false;}
@@ -1039,7 +1049,15 @@ async function api(path,opts,tmo,retried){const ctl=("AbortController"in window)
   if(!r.ok)throw new Error((j&&j.error)||("HTTP "+r.status));return j;}
  finally{if(to)clearTimeout(to);}}
 let busy=false,timer=null,suppress=false,activeCtl=null;
-let viewDate=null;const monthDays={};const monthFetched={};
+let viewDate=null,monthDays={},monthFetched={},CAL_TARGET=0; // monthDays按用户切换时清空（避免串数据）
+function invalidateMonthCache(){monthFetched={};} // 记录/删除/清空后调用，否则环的月度聚合是死缓存
+function ringSvg(pct){ // 进度环组件：viewBox 44 自适应容器；弧封顶100%，dashoffset 纯CSS过渡
+ const R=19,SW=3,C=2*Math.PI*R,off=C*(1-Math.min(100,Math.max(0,pct))/100);
+ return "<svg class='cring' viewBox='0 0 44 44' aria-hidden='true'>"+
+  "<circle class='ring-track' cx='22' cy='22' r='"+R+"' fill='none' stroke-width='"+SW+"'/>"+
+  "<circle class='ring-fill' cx='22' cy='22' r='"+R+"' fill='none' stroke-width='"+SW+"' stroke-linecap='round'"+
+  " stroke-dasharray='"+C+"' stroke-dashoffset='"+off+"' transform='rotate(-90 22 22)'/></svg>";
+}
 function todayStr(){return new Date().toISOString().slice(0,10);}
 function labelFor(ds){const t=todayStr();
  if(ds===t)return"今天";
@@ -1076,9 +1094,10 @@ function renderCal(){
  for(let d=1;d<=dim;d++){
   const ds=calY+"-"+String(calM).padStart(2,"0")+"-"+String(d).padStart(2,"0");
   const future=ds>t;
-  const has=(monthDays[ds]||{}).n>0;
+  const md=monthDays[ds]||{},has=md.n>0;
+  const pct=has&&CAL_TARGET?md.eaten/CAL_TARGET*100:0;
   const cls="cday"+(has?" has":"")+(future?" dis":"")+(ds===sel?" sel":"")+(ds===t?" today":"");
-  h+="<div class='calcell'><div class='"+cls+"' data-d='"+ds+"'>"+d+"</div></div>";
+  h+="<div class='calcell'><div class='"+cls+"' data-d='"+ds+"'>"+(has?ringSvg(pct):"")+d+"</div></div>";
  }
  const trail=(7-(lead+dim)%7)%7;
  for(let i=1;i<=trail;i++) // 下月溢出补满整周
@@ -1093,11 +1112,13 @@ function renderDateHead(){
 $("dLabel").onclick=openCal;
 const photoUrls={};
 async function loadThumb(id,img,uid){
+ if(photoUrls[id]){img.src=photoUrls[id];return;} // blob缓存命中直接复用，切日期不重拉
  try{const r=await fetch("/photo/"+id+(uid?"?user="+uid:""),TOKEN?{headers:{"X-Access-Token":TOKEN}}:{});
   if(!r.ok){img.style.display="none";return;}
   const b=await r.blob();
-  if(photoUrls[id])URL.revokeObjectURL(photoUrls[id]);
   photoUrls[id]=URL.createObjectURL(b);img.src=photoUrls[id];
+  const ks=Object.keys(photoUrls); // 上限50张：LRU淘汰，防翻历史内存无限涨
+  if(ks.length>50){URL.revokeObjectURL(photoUrls[ks[0]]);delete photoUrls[ks[0]];}
  }catch(e){img.style.display="none";}
 }
 function setLoading(msg){busy=true;$("bPhoto").disabled=true;$("bSend").disabled=true;
@@ -1127,15 +1148,16 @@ function listSkeleton(){ // 明细卡骨架屏：首屏/切用户时替代转圈
 }
 async function refresh(){
  if(!$("list").dataset.ready)listSkeleton();
- try{const j=await api("/api/today?user="+user+(viewDate?"&date="+viewDate:""));renderHero(j);}
+ try{const j=await api("/api/today?user="+user+(viewDate?"&date="+viewDate:""));
+  renderHero(j);renderDetail(j);$("list").dataset.ready=1;}
  catch(e){toast("加载失败："+e.message);}
- try{const j=await api("/api/today?user="+user+(viewDate?"&date="+viewDate:""));renderDetail(j);$("list").dataset.ready=1;}
- catch(e){toast("明细加载失败："+e.message);}
+ renderStrip();renderDateHead(); // 用本地缓存即时渲染周条/日期头，不等网络
  try{const pl=await api("/api/plan?user="+user);
   const w=await api("/api/workouts?user="+user);
   renderWK(pl,w.records||[]);
  }catch(e){}
- await ensureMonth(todayStr());renderStrip();renderDateHead();
+ await Promise.all([ensureMonth(todayStr()),ensureMonth(dstrShift(todayStr(),-7))]); // 补拉上月：周条跨月天有环数据
+ renderStrip();
 }
 function countUp(el,to){ // 剩余热量数字平滑过渡：300ms ease-out（rAF三次缓出），避免数值跳变
  const from=parseInt(el.textContent,10)||0;if(from===to){el.textContent=to;return;}
@@ -1145,6 +1167,7 @@ function countUp(el,to){ // 剩余热量数字平滑过渡：300ms ease-out（rA
   if(p<1)requestAnimationFrame(step);};
  requestAnimationFrame(step);}
 function renderHero(j){
+ CAL_TARGET=j.target||CAL_TARGET; // 环形比例的分母（当日目标热量）
  countUp($("remain"),j.remaining);
  $("remain").classList.toggle("over",j.remaining<0);
  const pct=Math.max(0,Math.min(100,j.target?j.eaten/j.target*100:0));
@@ -1224,8 +1247,8 @@ async function sendText(){
  const t=$("text").value.trim();if(!t)return;
  setLoading("识别中…");
  try{const j=await api("/api/meal",{method:"POST",headers:{"Content-Type":"application/json"},
-   body:JSON.stringify({user:user,text:t})},240000);
-  if(j.reply&&j.reply.indexOf("没识别出")>=0){showErr(j.reply);}else{showOk(j.reply);bump();refresh();}
+   body:JSON.stringify({user:user,text:t,date:viewDate||todayStr()})},240000);
+  if(j.reply&&j.reply.indexOf("没识别出")>=0){showErr(j.reply);}else{showOk(j.reply);bump();invalidateMonthCache();refresh();}
   $("text").value="";
  }catch(e){showErr(friendly(e.message));}
 }
@@ -1332,9 +1355,9 @@ $("avSave").onclick=async()=>{
  if(avBusy||!avItems.length)return;avBusy=true;
  try{
   await api("/api/save",{method:"POST",headers:{"Content-Type":"application/json"},
-   body:JSON.stringify({user:user,meal_type:avMeal,items:avItems,image:avB64})});
+   body:JSON.stringify({user:user,meal_type:avMeal,items:avItems,image:avB64,date:viewDate||todayStr()})});
   const kcal=avItems.reduce((s,i)=>s+(i.kcal||0),0);
-  closeAv();toast((kcal<0?"已扣回 ":"已记录 ")+kcal+" 千卡");refresh();
+  closeAv();toast((kcal<0?"已扣回 ":"已记录 ")+kcal+" 千卡");invalidateMonthCache();refresh();
  }catch(e){toast("保存失败："+e.message);}
  avBusy=false;
 };
@@ -1459,19 +1482,19 @@ $("eSave").onclick=async()=>{
     food:$("eFood").value.trim()||undefined,kcal:kcalV===""?undefined:parseFloat(kcalV),
     portion:$("ePortion").value.trim(),protein_g:$("eProtein").value===""?undefined:parseFloat($("eProtein").value),
     meal_type:meal,image:editB64||undefined})},60000);
-  closeEdit();bump();refresh();toast("已保存 ✓");
+  closeEdit();bump();invalidateMonthCache();refresh();toast("已保存 ✓");
  }catch(e){toast("保存失败："+e.message);}
  $("eSave").disabled=false;$("eSave").textContent="保存修改";editBusy=false;
 };
 async function delId(id){try{await api("/api/correct",{method:"POST",headers:{"Content-Type":"application/json"},
-  body:JSON.stringify({id:id,action:"delete"})});toast("已删除");bump();refresh();}catch(e){toast("删除失败："+e.message);}}
+  body:JSON.stringify({id:id,action:"delete"})});toast("已删除");bump();invalidateMonthCache();refresh();}catch(e){toast("删除失败："+e.message);}}
 let clearing=false;
 $("clearBtn").onclick=()=>showBack("clearBack");
 $("cCancel").onclick=()=>hideBack("clearBack");
 $("cOk").onclick=async()=>{
  hideBack("clearBack");if(clearing)return;clearing=true;
  try{const j=await api("/api/clear",{method:"POST",headers:{"Content-Type":"application/json"},
-  body:JSON.stringify({user:user})});toast("已清空 "+j.cleared+" 条");bump();refresh();}
+  body:JSON.stringify({user:user})});toast("已清空 "+j.cleared+" 条");bump();invalidateMonthCache();refresh();}
  catch(e){toast("清空失败："+e.message);}
  clearing=false;
 };
@@ -1479,6 +1502,7 @@ function bump(){const el=$("remain");el.classList.remove("bump");void el.offsetW
 // ---- 本周训练卡（计划 vs 实际）----
 const WKDAYS=["周一","周二","周三","周四","周五","周六","周日"];
 async function ensureMonth(ym){
+ ym=ym.slice(0,7); // 兼容误传完整日期（后端校验 YYYY-MM，传整日期会400且被静默吞掉）
  if(monthFetched[ym])return;monthFetched[ym]=true;
  try{const j=await api("/api/month?user="+user+"&ym="+ym);
   j.days.forEach(d=>monthDays[d.date]={eaten:d.eaten,n:d.n});
@@ -1491,10 +1515,11 @@ function renderStrip(){
   const d=new Date();d.setDate(d.getDate()-i);
   const ds=d.toISOString().slice(0,10);
   const wd=["日","一","二","三","四","五","六"][d.getDay()];
-  const n=(monthDays[ds]||{}).n||0;
+  const md=monthDays[ds]||{},n=md.n||0;
+  const pct=n&&CAL_TARGET?md.eaten/CAL_TARGET*100:0;
   const selCls=(ds===sel)?" sel":"";
   h+="<div class='sday"+(n>0?" has":"")+selCls+"' data-d='"+ds+"'>"+
-   "<div class='swd'>"+wd+"</div><div class='ring'>"+d.getDate()+"</div></div>";
+   "<div class='swd'>"+wd+"</div><div class='ring'>"+(n?ringSvg(pct):"")+d.getDate()+"</div></div>";
  }
  el.innerHTML=h;
  el.querySelectorAll(".sday").forEach(sd=>sd.onclick=()=>setViewDate(sd.dataset.d));
@@ -1808,7 +1833,7 @@ class H(BaseHTTPRequestHandler):
             raise ApiError("没有要保存的食物")
         for it in items:
             it["meal_type"] = mt
-        ids = insert_meals(user, items)
+        ids = insert_meals(user, items, j.get("date"))
         img_b64 = j.get("image")  # 本次分析的照片存档 → 明细缩略图
         if img_b64:
             try:
@@ -1862,10 +1887,11 @@ class H(BaseHTTPRequestHandler):
 
     def _handle_meal(self, body: bytes):
         ctype = self.headers.get("Content-Type", "")
-        user, text, image_b64 = None, "", None
+        user, text, image_b64, rec_date = None, "", None, None
         if "application/json" in ctype:
             j = json.loads(body.decode("utf-8"))
             user, text, image_b64 = j.get("user"), (j.get("text") or "").strip(), j.get("image")
+            rec_date = j.get("date")
         else:
             fields, files = parse_multipart(ctype, body)
             user, text = fields.get("user"), fields.get("text", "")
@@ -1948,8 +1974,9 @@ class H(BaseHTTPRequestHandler):
             return self._json(200, {"reply": reply, "ids": ids})
 
         items = [resolve_item(i, user) for i in items]
-        ids = insert_meals(user, items)
-        summary = today_summary(user)
+        rec_date = valid_date(rec_date)
+        ids = insert_meals(user, items, rec_date)
+        summary = today_summary(user, rec_date)  # 回显跟随记录日期，非固定今天
         reply = build_card(items, summary)
         if CFG.get("mock"):
             reply += "\n⚠️ MOCK 测试模式：以上数值是假数据（接真模型见 docs/05 §2）"
