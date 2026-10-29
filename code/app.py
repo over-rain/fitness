@@ -652,6 +652,7 @@ input[type=text]:focus{border-color:var(--color-primary)}
  font-size:13px;color:var(--text-secondary);background:var(--color-card-bg)}
 .sday.has .ring{border-color:transparent;color:var(--text-main);font-weight:600}
 .sday.sel .ring{color:var(--color-primary);font-weight:700}
+.sday.today .ring{color:var(--color-primary);font-weight:700}
 .sday.sel .swd{color:var(--text-main);font-weight:600}
 .cxlink{color:var(--color-primary);cursor:pointer;text-decoration:underline;margin-left:10px}
 /* 日历sheet：手机100vw撑满（桌面收进430px居中）；高度由内容自适应、整月全显示不滚动；
@@ -679,19 +680,18 @@ input[type=text]:focus{border-color:var(--color-primary)}
 @media(hover:hover){.cday:hover{background:var(--color-primary-soft)}}
 /* 状态严格区分：有记录=主色描边；选中=描边+浅主色底；今天=实心主色白字；
    未来/溢出=浅灰禁用，pointer-events:none 禁一切交互响应 */
-/* 有记录=进度环（SVG叠加）；选中=浅主色底与环共存；今天=数字下小绿点 */
+/* 有记录=进度环（SVG叠加）；选中=浅主色底与环共存；今天=主色粗体数字（点与环重合已弃用） */
 .cring{position:absolute;inset:0;width:100%;height:100%}
 .cday.sel{background:var(--color-primary-soft);
  color:var(--color-primary);font-weight:700}
-.cday.today::after{content:"";position:absolute;bottom:3px;left:50%;transform:translateX(-50%);
- width:4px;height:4px;border-radius:50%;background:var(--color-primary)}
+.cday.today{color:var(--color-primary);font-weight:700}
 .cday.dis,.cday.out{color:var(--text-secondary);font-weight:400;opacity:.4;
  pointer-events:none;cursor:default}
 .callegend{display:flex;align-items:center;gap:14px;margin-top:10px;
  padding-top:10px;border-top:1px dashed var(--color-divider)}
 .callegend .lg{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;color:var(--text-secondary)}
 .lg-ring{width:13px;height:13px;border-radius:50%;border:2px solid var(--color-primary);box-sizing:border-box}
-.lg-dot{width:13px;height:13px;border-radius:50%;background:var(--color-primary)}
+.lg-today{color:var(--color-primary);font-weight:700;font-size:14px;line-height:1}
 .caltoday{margin-left:auto;border:0;background:var(--color-primary-soft);color:var(--color-primary);
  font-size:12.5px;font-weight:600;border-radius:var(--radius-tag);padding:7px 13px;cursor:pointer}
 .ring-track{stroke:var(--ring-bg)}
@@ -815,7 +815,7 @@ button{transition:transform .12s;font-family:var(--font-family)}
  <div class="btnrow">
   <button class="photo" id="bPhoto">📷 拍照记录</button>
   <button class="send" id="bSend">发送</button></div>
- <input type="file" id="photo" accept="image/*" style="display:none">
+ <input type="file" id="photo" accept="image/*" capture="environment" style="display:none">
  <div id="reply"></div></div>
 <div class="card" id="wkCard" style="display:none"></div>
 <div class="card"><div style="display:flex;justify-content:flex-end;margin-bottom:6px">
@@ -831,7 +831,7 @@ button{transition:transform .12s;font-family:var(--font-family)}
   </div>
   <div class="calwd"><span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span><span>日</span></div>
   <div class="calgrid" id="calGrid"></div>
-  <div class="callegend"><span class="lg"><span class="lg-dot"></span>今天</span><span class="lg"><span class="lg-ring"></span>已有记录</span><button id="calToday" class="caltoday">回到今天</button></div>
+  <div class="callegend"><span class="lg"><b class="lg-today">28</b>今天</span><span class="lg"><span class="lg-ring"></span>已有记录</span><button id="calToday" class="caltoday">回到今天</button></div>
  </div></div>
 <div class="mback up" id="editBack" style="display:none">
  <div class="sheet">
@@ -856,8 +856,8 @@ button{transition:transform .12s;font-family:var(--font-family)}
  </div></div>
 <div class="mback" id="clearBack" style="display:none">
  <div class="modal" style="max-width:320px">
-  <div class="etitle">确定清空今天的全部记录吗？</div>
-  <div class="muted" style="text-align:center;font-size:12px;padding-bottom:10px">清空后不可恢复（含当日全部条目与照片）</div>
+  <div class="etitle">确定清空该日的全部记录吗？</div>
+  <div class="muted" style="text-align:center;font-size:12px;padding-bottom:10px">清空的是当前所选日期，不可恢复（含当日全部条目与照片）</div>
   <div class="ebtns"><button class="ghost" id="cCancel">取消</button><button class="primary danger" id="cOk">清空</button></div>
  </div></div>
 <div class="mback" id="mback">
@@ -1108,7 +1108,7 @@ function renderCal(){
 }
 function renderDateHead(){
  $("dLabel").textContent=labelFor(viewDate||todayStr())+" ▾";
- $("clearBtn").style.display=viewDate?"none":"";}
+ $("clearBtn").style.display="";} // 清空跟随所选日期（后端已支持 date），历史日期也可清
 $("dLabel").onclick=openCal;
 const photoUrls={};
 async function loadThumb(id,img,uid){
@@ -1146,14 +1146,18 @@ function listSkeleton(){ // 明细卡骨架屏：首屏/切用户时替代转圈
  const card="<div class='card gcard'><div class='skel' style='height:16px;width:38%;margin-bottom:10px'></div>"+row+row+"</div>";
  $("list").innerHTML=card+card;
 }
+let refreshSeq=0;
 async function refresh(){
+ const seq=++refreshSeq; // 竞态守卫：快速切日期时旧响应后到会被丢弃，防止旧数据覆盖新选择
  if(!$("list").dataset.ready)listSkeleton();
  try{const j=await api("/api/today?user="+user+(viewDate?"&date="+viewDate:""));
+  if(seq!==refreshSeq)return;
   renderHero(j);renderDetail(j);$("list").dataset.ready=1;}
- catch(e){toast("加载失败："+e.message);}
+ catch(e){if(seq===refreshSeq)toast("加载失败："+e.message);}
  renderStrip();renderDateHead(); // 用本地缓存即时渲染周条/日期头，不等网络
  try{const pl=await api("/api/plan?user="+user);
   const w=await api("/api/workouts?user="+user);
+  if(seq!==refreshSeq)return;
   renderWK(pl,w.records||[]);
  }catch(e){}
  await Promise.all([ensureMonth(todayStr()),ensureMonth(dstrShift(todayStr(),-7))]); // 补拉上月：周条跨月天有环数据
@@ -1494,7 +1498,7 @@ $("cCancel").onclick=()=>hideBack("clearBack");
 $("cOk").onclick=async()=>{
  hideBack("clearBack");if(clearing)return;clearing=true;
  try{const j=await api("/api/clear",{method:"POST",headers:{"Content-Type":"application/json"},
-  body:JSON.stringify({user:user})});toast("已清空 "+j.cleared+" 条");bump();invalidateMonthCache();refresh();}
+  body:JSON.stringify({user:user,date:viewDate||todayStr()})});toast("已清空 "+j.cleared+" 条");bump();invalidateMonthCache();refresh();}
  catch(e){toast("清空失败："+e.message);}
  clearing=false;
 };
@@ -1518,7 +1522,8 @@ function renderStrip(){
   const md=monthDays[ds]||{},n=md.n||0;
   const pct=n&&CAL_TARGET?md.eaten/CAL_TARGET*100:0;
   const selCls=(ds===sel)?" sel":"";
-  h+="<div class='sday"+(n>0?" has":"")+selCls+"' data-d='"+ds+"'>"+
+  const todayCls=(ds===todayStr())?" today":"";
+  h+="<div class='sday"+(n>0?" has":"")+selCls+todayCls+"' data-d='"+ds+"'>"+
    "<div class='swd'>"+wd+"</div><div class='ring'>"+(n?ringSvg(pct):"")+d.getDate()+"</div></div>";
  }
  el.innerHTML=h;
@@ -1772,11 +1777,11 @@ class H(BaseHTTPRequestHandler):
             self._json(500, {"error": repr(ex)})
 
     def _handle_clear(self, j):
-        """清空今日该用户全部记录（含照片文件，含训练记录）"""
+        """清空指定日期该用户全部记录（含照片文件，含训练记录）；缺省今天"""
         user = j.get("user")
         if user not in USERS:
             raise ApiError("user 必须是 beifeng / gagayouna")
-        date = datetime.now().strftime("%Y-%m-%d")
+        date = valid_date(j.get("date"))
         with db() as conn:
             rows = conn.execute("SELECT id FROM meals WHERE user_id=? AND date=?", (user, date)).fetchall()
             conn.execute("DELETE FROM meals WHERE user_id=? AND date=?", (user, date))
