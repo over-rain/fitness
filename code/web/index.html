@@ -1,0 +1,140 @@
+<!doctype html><html lang="zh"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="theme-color" content="#E6F6E9">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>减肥管家</title>
+<link rel="stylesheet" href="/app.css">
+</head><body>
+<div class="view" data-theme="home" id="homeView">
+<div class="hd"><h1>🍱 减肥管家</h1>
+ <div style="display:flex;gap:6px;align-items:center">
+  <div class="seg"><button id="u1"></button><button id="u2"></button></div>
+  <button class="gear" id="gear" title="身体档案设置">⚙️</button>
+  <button class="gear" id="themeBtn" title="切换全局主题">🧊</button>
+ </div></div>
+<div class="dchead">
+ <button class="dlabel" id="dLabel">今天</button>
+</div>
+<div class="strip" id="strip"></div>
+<div class="card">
+ <div class="muted">今日剩余</div>
+ <div class="num"><span id="remain">–</span><small>kcal</small></div>
+ <div class="bar" id="bar"><i></i></div>
+ <div class="sumline" id="sumline"></div>
+ <div class="dinnerline" id="dinner"></div></div>
+<div class="card">
+ <input type="text" id="text" placeholder="说一句吃了啥，如：早上吃了一根烤肠" autocomplete="off">
+ <div class="btnrow">
+  <button class="photo" id="bPhoto">📷 拍照记录</button>
+  <button class="send" id="bSend">发送</button></div>
+ <input type="file" id="photo" accept="image/*" capture="environment" style="display:none">
+ <div id="reply"></div></div>
+<div class="card" id="wkCard" style="display:none"></div>
+<div class="card"><div style="display:flex;justify-content:flex-end;margin-bottom:6px">
+ <button id="clearBtn" style="border:1px solid var(--color-danger-border);background:var(--color-danger-soft);color:var(--color-danger);font-size:12.5px;font-weight:600;border-radius:var(--radius-tag);padding:6px 14px;cursor:pointer;display:none">清空</button></div>
+<div id="list"></div></div>
+<div class="mback top" id="calBack" style="display:none">
+ <div class="sheet cal">
+  <button id="calClose" class="calx" aria-label="关闭">✕</button>
+  <div class="calnav">
+   <button id="calPrevM" class="navarrow" aria-label="上个月">‹</button>
+   <b id="calTitle">2026年10月</b>
+   <button id="calNextM" class="navarrow" aria-label="下个月">›</button>
+  </div>
+  <div class="calwd"><span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span><span>日</span></div>
+  <div class="calgrid" id="calGrid"></div>
+  <div class="callegend"><span class="lg"><b class="lg-today">28</b>今天</span><span class="lg"><span class="lg-ring"></span>已有记录</span><button id="calToday" class="caltoday">回到今天</button></div>
+ </div></div>
+<div class="mback up" id="editBack" style="display:none">
+ <div class="sheet">
+  <div class="mhead"><b>编辑食物</b><button id="eClose">✕</button></div>
+  <div class="ehead">
+   <img id="eThumb" class="ethumb" alt="" style="display:none">
+   <div class="ethumb ph" id="eThumbPh" role="img" aria-label="暂无照片"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M4 13h16"/><path d="M5 13a7 7 0 0 0 14 0z"/><path d="M9 13V9h6v4"/></svg></div>
+   <div class="ehint">点头像可更换这张照片</div>
+   <input type="file" id="ePhoto" accept="image/*" style="display:none">
+  </div>
+  <div class="elabel">食物名称</div>
+  <input class="einput" id="eFood">
+  <div class="elabel">食用克重（改这里，热量/蛋白自动按比例更新）</div>
+  <input class="einput" id="ePortion">
+  <div class="elabel">热量 kcal</div>
+  <input class="einput" id="eKcal" type="number">
+  <div class="elabel">蛋白 g（可选）</div>
+  <input class="einput" id="eProtein" type="number">
+  <div class="elabel">餐段</div>
+  <div class="pills" id="ePills"></div>
+  <div class="ebtns"><button class="ghost" id="eCancel">取消</button><button class="primary" id="eSave">保存修改</button></div>
+ </div></div>
+<div class="mback" id="clearBack" style="display:none">
+ <div class="modal" style="max-width:320px">
+  <div class="etitle">确定清空该日的全部记录吗？</div>
+  <div class="muted" style="text-align:center;font-size:12px;padding-bottom:10px">清空的是当前所选日期，不可恢复（含当日全部条目与照片）</div>
+  <div class="ebtns"><button class="ghost" id="cCancel">取消</button><button class="primary danger" id="cOk">清空</button></div>
+ </div></div>
+<div class="mback" id="mback">
+ <div class="modal">
+  <div class="mhead"><b>设置</b><button id="mclose">✕</button></div>
+  <div class="tabs"><button class="tab on" id="tProfile">👤 个人信息</button><button class="tab" id="tGeneral">⚙️ 通用</button><button class="tab" id="tPlan" style="display:none">🏋️ 训练计划</button></div>
+  <div class="panel on" id="pProfile">
+   <div class="muted" style="margin-bottom:9px">保存后自动按 Mifflin-St Jeor 重算热量线</div>
+   <div class="grid">
+    <div><label>名称</label><input type="text" id="s_name"></div>
+    <div><label>性别</label><select id="s_gender"><option value="male">男</option><option value="female">女</option></select></div>
+    <div><label>年龄</label><input type="number" id="s_age"></div>
+    <div><label>身高 cm</label><input type="number" id="s_height"></div>
+    <div><label>体重 kg</label><input type="number" step="0.1" id="s_weight"></div>
+    <div><label>目标体重 kg</label><input type="number" step="0.1" id="s_targetw"></div>
+    <div><label>周练天数</label><input type="number" min="0" max="7" id="s_days"></div>
+   </div>
+   <div class="elabel" style="margin-top:12px">减脂缺口（每天少吃的量）</div>
+   <div class="num" style="font-size:26px;margin:0 0 6px"><span id="s_defval">350</span><small> kcal</small></div>
+   <input type="range" id="s_deficit" min="0" max="750" step="25" value="350" style="width:100%;accent-color:var(--color-primary)">
+   <div class="svals"><span>0 维持</span><span>温和 350</span><span>标准 500</span><span>激进 750</span></div>
+   <div class="calcbox" id="calcBox"></div>
+   <button class="save" id="s_save">💾 保存并重算</button>
+   <div class="muted" id="s_hint" style="margin-top:9px"></div>
+  </div>
+  <div class="panel" id="pGeneral">
+   <label style="display:flex;align-items:flex-start;gap:9px;cursor:pointer;padding:4px 2px">
+    <input type="checkbox" id="mockChk" style="width:17px;height:17px;margin-top:2px">
+    <span style="font-size:13.5px">测试模式<br><span class="muted" style="font-size:11.5px">识别立即返回示例数据，不请求大模型（用于测试界面与入库流程）</span></span></label>
+  </div>
+  <div class="panel" id="pPlan">
+   <div class="muted" style="margin-bottom:6px">把你的每周训练计划文本粘贴到这里（例：周一 胸 卧推4x12 飞鸟3x15；周三 背 杠铃划船4x10……），AI 解析成结构化计划。已存计划会被覆盖。</div>
+   <textarea id="pText" maxlength="2000" placeholder="周一 胸 卧推4x12 飞鸟3x15&#10;周三 背 杠铃划船4x10&#10;周五 腿 深蹲4x12……" style="width:100%;height:130px;box-sizing:border-box;border:1.5px solid var(--color-card-border);border-radius:12px;padding:11px 12px;font-size:14px;outline:none;background:var(--color-card-bg);color:var(--text-main);resize:vertical;font-family:var(--font-family)"></textarea>
+   <div class="ebtns"><button class="ghost" id="pParse">🔍 解析预览</button><button class="primary" id="pSaveP">💾 保存计划</button></div>
+   <div class="muted" id="pPrev" style="margin-top:9px;white-space:pre-wrap;font-size:12px"></div>
+  </div>
+ </div></div>
+</div>
+<div class="view" data-theme="meal" id="av">
+ <div class="avbar">
+  <button id="avBack" aria-label="返回"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5"/><path d="m12 19-7-7 7-7"/></svg></button>
+  <button id="avMeal"></button>
+  <div style="width:34px"></div>
+ </div>
+ <div id="avmenu"></div>
+ <div class="avwrap">
+  <div class="card card--image"><img id="avImg" class="card__image" alt="餐食照片"></div>
+  <div class="card" id="avKcal"></div>
+  <div class="avmrow3" id="avM"></div>
+  <div class="card" id="avItems"></div>
+ </div>
+ <div class="avbtns"><button id="avFix">✏️ AI 修正</button><button id="avSave" class="btn-primary">💾 保存记录</button></div>
+ <div class="mback" id="fixBack" style="display:none">
+  <div class="modal">
+   <div class="mhead"><b>AI 修正结果</b><button id="fixClose">✕</button></div>
+   <div class="muted" style="margin-bottom:8px">例：图里的不是鸡蛋是鸭蛋｜只吃了一半，热量减半｜这是中午那盘的剩余，扣回</div>
+   <div class="fixphotoline"><button type="button" id="fixPhotoBtn">📷 传吃剩的照片</button><img id="fixThumb" style="display:none" alt=""><span class="muted" id="fixPhotoHint">可选：拍剩余的盘子，AI 按图扣减</span></div>
+   <input type="file" id="fixPhoto" accept="image/*" capture="environment" style="display:none">
+   <textarea id="fixText" maxlength="200" placeholder="告诉 AI 需要修正的部分，会重新分析"></textarea>
+   <div class="fixcnt" id="fixCnt">0/200</div>
+   <button class="save" id="fixOk">确定</button>
+   <div class="fixerr" id="fixErr"></div>
+  </div></div>
+</div>
+<div id="toast"></div>
+
+<script src="/app.js"></script></body></html>

@@ -14,6 +14,8 @@ fitness v1 本地版 —— 拍照记餐 + 剩余额度（零依赖，仅 Python
   POST /api/correct      JSON: {id, action:"delete"|"edit", kcal?, food?}
 """
 import base64
+import gzip
+import hashlib
 import hmac
 import json
 import os
@@ -126,6 +128,7 @@ def init_db():
     os.makedirs(os.path.join(DATA, "meals"), exist_ok=True)
     os.makedirs(os.path.join(DATA, "plans"), exist_ok=True)
     with db() as conn:
+        conn.execute("PRAGMA journal_mode=WAL")  # 并发读写（上传+汇总）不再偶发 database locked
         conn.execute(
             """CREATE TABLE IF NOT EXISTS meals (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -449,1144 +452,14 @@ def build_card(items, summary, verb="记录"):
 
 # ---------------------------------------------------------------- 页面
 
-INDEX = r"""<!doctype html><html lang="zh"><head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
-<meta name="theme-color" content="#E6F6E9">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<title>减肥管家</title>
-<style>
-/* ===== ① Base 设计令牌（home/meal 共用，禁止修改）===== */
-:root{
- --radius-lg:14px;--radius-xl:16px;--radius-tag:999px;--radius-btn:16px;--radius-img:16px;
- --dur-fast:240ms;--dur-base:260ms;--dur-press:100ms;--ease-out:cubic-bezier(.25,.46,.45,.94);
- --padding-card-normal:24px;--padding-card-image:8px;--gap-card:16px;
- --card-backdrop-blur:12px;
- --font-family:system-ui,-apple-system,"PingFang SC",sans-serif;
- --font-size-heading:18px;--font-size-big-number:40px;--font-size-unit:20px;
- --font-size-body:16px;--font-size-small:14px;
- --font-weight-bold:700;--font-weight-normal:400;
- --color-danger:#E03131;--color-danger-soft:#FFF1F1;--color-danger-border:#FFC9C9;
- --color-warn:#F59E0B;--toast-bg:#111827;
- --color-solid:#FFFFFF;
-}
-/* ===== ② 主题语义变量（视图容器挂 data-theme）===== */
-[data-theme="home"]{
- --color-page-bg:#E6F6E9;
- --color-page-bg-gradient:linear-gradient(180deg,#C9E9D2 0%,#E6F6E9 55%,#D8EEDD 100%);
- --color-card-bg:rgba(255,255,255,0.72);
- --color-card-border:rgba(255,255,255,0.85);
- --color-primary:#57C374;
- --color-primary-soft:rgba(87,195,116,0.15);
- --text-main:#1A3A26;--text-secondary:#4A6B56;--text-placeholder:rgba(26,58,38,.42);
- --progress-bar:#57C374;
- --shadow-card:0 4px 16px rgba(160,200,170,0.15),0 1px 4px rgba(160,200,170,0.08);
- --color-divider:rgba(160,200,170,0.3);
- --ring-bg:#E3F3E7;--ring-progress:#57C374;
- --bar-track:#D9EEDD;
-}
-[data-theme="meal"]{
- --color-page-bg:#E8F2FC;
- --color-page-bg-gradient:linear-gradient(180deg,#BFDBF7 0%,#E8F2FC 55%,#D6E7F8 100%);
- --color-card-bg:rgba(255,255,255,0.72);
- --color-card-border:rgba(255,255,255,0.85);
- --color-primary:#3B88ED;
- --color-primary-soft:rgba(59,136,237,0.15);
- --text-main:#1A3050;--text-secondary:#546278;--text-placeholder:rgba(26,48,80,.42);
- --progress-bar:#3B88ED;
- --shadow-card:0 4px 16px rgba(150,180,220,0.15),0 1px 4px rgba(150,180,220,0.08);
- --color-divider:rgba(180,205,235,0.3);
- --ring-bg:#E5EEF9;--ring-progress:#3B88ED;
- --bar-track:#D9E6F7;
-}
-/* ===== 基础 ===== */
-*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-body{font-family:var(--font-family);margin:0;color:var(--text-main);touch-action:manipulation}
-input::placeholder,textarea::placeholder{color:var(--text-placeholder)}
-.view{min-height:100vh;background:var(--color-page-bg-gradient,var(--color-page-bg));color:var(--text-main)}
-#homeView{max-width:430px;margin:0 auto;padding:14px 12px 30px}
-#homeView .card{margin-bottom:var(--gap-card)}
-#homeView .card:last-child{margin-bottom:0}
-/* ===== 统一组件（两主题共用，只读变量）===== */
-.card{background:var(--color-card-bg);border:1px solid var(--color-card-border);border-radius:var(--radius-lg);
- backdrop-filter:blur(var(--card-backdrop-blur));-webkit-backdrop-filter:blur(var(--card-backdrop-blur));
- box-shadow:var(--shadow-card);padding:var(--padding-card-normal)}
-.card--image{padding:var(--padding-card-image)}
-.card__image{width:100%;border-radius:var(--radius-lg);display:block;max-height:320px;object-fit:cover}
-.tag{background:var(--color-primary);color:#fff;border-radius:var(--radius-tag);
- font-size:var(--font-size-small);padding:6px 12px;display:inline-block}
-.btn-primary{background:var(--color-primary);color:#fff;border:0;border-radius:var(--radius-btn);
- font-size:var(--font-size-body);padding:14px 24px;font-weight:600;cursor:pointer}
-.text-heading{font-size:var(--font-size-heading);color:var(--text-secondary);font-weight:var(--font-weight-normal)}
-.text-huge-cal{font-size:var(--font-size-big-number);color:var(--text-main);font-weight:var(--font-weight-bold)}
-.text-unit{font-size:var(--font-size-unit);color:var(--text-secondary)}
-.text-body{font-size:var(--font-size-body);color:var(--text-main)}
-.text-small{font-size:var(--font-size-small);color:var(--text-secondary)}
-.muted{color:var(--text-secondary);font-size:var(--font-size-small)}
-/* ===== 首页头部 ===== */
-.hd{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px;
- margin:2px 2px 12px}
-.hd h1{font-size:var(--font-size-heading);margin:0;color:var(--text-main);white-space:nowrap}
-.seg{display:flex;gap:6px}
-.seg button{padding:6px 10px;border:1px solid var(--color-card-border);background:var(--color-card-bg);
- border-radius:var(--radius-tag);font-size:12px;color:var(--text-secondary);white-space:nowrap}
-.seg button.on{background:var(--color-primary);border-color:var(--color-primary);color:#fff;font-weight:600}
-.gear{border:1px solid var(--color-card-border);background:var(--color-card-bg);
- border-radius:var(--radius-tag);padding:7px 10px;font-size:14px;color:var(--text-main)}
-/* ===== 首页：剩余卡 ===== */
-.num{font-size:var(--font-size-big-number);font-weight:var(--font-weight-bold);letter-spacing:-.5px;
- margin:2px 0 10px;color:var(--text-main)}
-.num.over{color:var(--color-danger)}
-.num small{font-size:var(--font-size-small);color:var(--text-secondary);font-weight:400;margin-left:3px}
-.bar{height:9px;background:var(--bar-track);border-radius:99px;overflow:hidden}
-.bar i{display:block;height:100%;width:0;border-radius:99px;background:var(--progress-bar);transition:width .3s var(--ease-out)}
-.bar.warn i{background:var(--color-warn)}
-.sumline{margin-top:9px;font-size:12.5px;color:var(--text-secondary)}
-.dinnerline{display:none;margin-top:9px;padding-top:8px;border-top:1px dashed var(--color-divider);
- font-size:12.5px;color:var(--text-secondary)}
-.dinnerline.show{display:block}
-@keyframes bump{30%{transform:scale(1.1);color:var(--color-primary)}}
-.num.bump{animation:bump .5s}
-/* ===== 首页：输入卡 ===== */
-input[type=text]{width:100%;border:1.5px solid var(--color-divider);border-radius:12px;padding:12px 13px;
- font-size:15px;outline:none;background:var(--color-solid);color:var(--text-main);
- box-shadow:0 1px 4px var(--shadow-card-2)}
-input[type=text]:focus{border-color:var(--color-primary)}
-.btnrow{display:flex;gap:9px;margin-top:11px}
-.btnrow button{flex:1;border:0;border-radius:var(--radius-btn);padding:13px;font-size:var(--font-size-body);
- font-weight:600;color:#fff;transition:opacity .2s}
-.btnrow button:disabled{opacity:.45}
-.photo{background:var(--color-primary)}
-.btnrow .send{background:var(--color-card-bg);border:1.5px solid var(--color-primary);color:var(--color-primary)}
-#reply{margin-top:11px;border-radius:12px;padding:12px 13px;font-size:13.5px;line-height:1.75;white-space:pre-wrap;display:none}
-#reply.ok{display:block;background:var(--color-solid);border-left:3px solid var(--color-primary)}
-#reply.err{display:block;background:var(--color-danger-soft);border-left:3px solid var(--color-danger);color:var(--color-danger)}
-#reply.wait{display:block;background:var(--color-solid);border-left:3px solid var(--color-divider);color:var(--text-secondary)}
-.spin{display:inline-block;width:13px;height:13px;border:2px solid var(--color-divider);
- border-top-color:var(--color-primary);border-radius:50%;vertical-align:-2px;margin-right:8px;animation:sp .8s linear infinite}
-@keyframes sp{to{transform:rotate(360deg)}}
-/* ===== 首页：明细 ===== */
-.chip{display:inline-block;background:var(--color-primary-soft);color:var(--color-primary);
- border-radius:6px;padding:1px 6px;font-size:11px;margin-right:6px}
-.gcard{padding:14px}
-.wkrow{display:flex;align-items:center;gap:6px;padding:6px 2px;font-size:13px;
- color:var(--text-secondary);border-bottom:1px dashed var(--color-divider)}
-.wkrow:last-child{border-bottom:0}
-.ghead{display:flex;align-items:center;gap:8px;padding:0 2px 2px}
-.gh-emoji{font-size:18px}
-.gh-name{font-size:16px;font-weight:700;color:var(--text-main)}
-.gh-tot{margin-left:auto;text-align:right}
-.gh-tot small{display:block;color:var(--text-secondary);font-size:11px;font-weight:400}
-.gh-tot b{font-size:15px;color:var(--text-main)}
-.gsug{font-size:12px;color:var(--text-secondary);margin:0 2px 10px}
-.mrow{position:relative;overflow:hidden;border-radius:14px;margin-bottom:9px;
- box-shadow:0 1px 4px var(--shadow-card-2)}
-.mrow:last-child{margin-bottom:0}
-.dz{position:absolute;top:4px;bottom:4px;right:4px;width:70px;display:flex;align-items:center;justify-content:center;
- opacity:0;pointer-events:none;transition:opacity .18s}
-.mrow.open .dz{opacity:1;pointer-events:auto}
-.delzone2{width:64px;height:40px;border-radius:12px;border:0;
- background:var(--color-danger);color:#fff;font-size:13px;font-weight:600;cursor:pointer;
- display:flex;align-items:center;justify-content:center;padding:0}
-.thumb.ph{color:var(--text-secondary)}
-.mmain{position:relative;display:flex;align-items:center;gap:10px;padding:8px;background:var(--color-card-bg);
- border-radius:14px;transition:transform .18s;touch-action:pan-y;user-select:none}
-.thumb{width:48px;height:48px;border-radius:12px;object-fit:cover;flex:none;background:var(--bar-track)}
-.thumb.ph{display:flex;align-items:center;justify-content:center;font-size:20px}
-.mname{flex:1;font-size:14.5px;font-weight:600;min-width:0;word-break:break-all;color:var(--text-main)}
-.msub{font-size:11.5px;color:var(--text-secondary);margin-top:2px;font-weight:400}
-.kcell{color:var(--text-secondary);white-space:nowrap;font-size:13px;cursor:pointer}
-.kcell b{color:var(--text-main);font-weight:600}
-.chev{color:var(--text-secondary);margin-left:4px;font-weight:700}
-#toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%);background:var(--toast-bg);color:#fff;
- padding:9px 16px;border-radius:10px;font-size:13px;opacity:0;transition:opacity .3s;pointer-events:none;max-width:80vw}
-#toast.show{opacity:.92}
-/* ===== 餐详情（meal 视图）===== */
-#av{display:none;position:fixed;top:0;bottom:0;left:0;right:0;margin:0 auto;max-width:430px;
- background:var(--color-page-bg-gradient,var(--color-page-bg));z-index:40;overflow-y:auto;padding-bottom:86px;
- border-left:1px solid var(--color-card-border);border-right:1px solid var(--color-card-border);
- -webkit-overflow-scrolling:touch;animation:fadeIn .2s}
-.avbar{position:sticky;top:0;display:flex;align-items:center;justify-content:space-between;
- padding:12px 14px;background:transparent;z-index:5}
-.avbar>button{border:1px solid var(--color-card-border);background:var(--color-card-bg);
- border-radius:var(--radius-btn);font-size:14px;color:var(--text-main);
- box-shadow:0 1px 4px var(--shadow-card-2)}
-#avBack{width:40px;height:40px;font-weight:700;font-size:20px}
-#avMeal{padding:10px 20px;font-size:15px;font-weight:700}
-#avmenu{position:fixed;top:56px;left:50%;transform:translateX(-50%);background:var(--color-card-bg);
- border:1px solid var(--color-card-border);box-shadow:var(--shadow-card);display:none;z-index:60;overflow:hidden}
-#avmenu button{display:block;width:100%;border:0;background:none;padding:11px 30px;
- font-size:14.5px;color:var(--text-main)}
-#avmenu button.on{background:var(--color-primary-soft);color:var(--color-primary);font-weight:700}
-.card__image{width:100%;max-height:320px;object-fit:cover;display:block;background:var(--bar-track)}
-.avwrap{padding:12px;display:flex;flex-direction:column;gap:var(--gap-card)}
-.kchead{margin-bottom:2px}
-.kctagrow{display:flex;justify-content:flex-end;margin-top:10px}
-.avmrow3{display:flex;gap:var(--gap-card)}
-.mcd{flex:1;min-width:0;padding:12px 8px}
-.mcrow{display:flex;align-items:center;gap:10px}
-.mcol{flex:1;text-align:left;min-width:0}
-.mc-l{font-size:12.5px;font-weight:600;color:var(--text-main);white-space:nowrap}
-.mc-v{font-size:15px;font-weight:600;color:var(--text-main);margin-top:2px}
-.mc-n{font-size:10.5px;color:var(--text-secondary);margin-top:8px;padding-top:7px;
- border-top:1px solid var(--color-divider);white-space:nowrap;overflow:hidden}
-.mc-n b{color:var(--text-main);font-size:12.5px}
-.svals{display:flex;justify-content:space-between;font-size:10.5px;color:var(--text-secondary);margin-top:4px}
-.calcbox{margin-top:10px;padding:9px 11px;background:var(--color-solid);border-radius:10px;
- border:1px solid var(--color-divider);font-size:12px;color:var(--text-secondary)}
-.calcbox .crow{display:flex;justify-content:space-between;padding:2px 0}
-.calcbox .caltotal{margin-top:4px;padding-top:5px;border-top:1px dashed var(--color-divider);
- color:var(--text-main);font-size:12.5px}
-.calcbox .caltotal b{color:var(--color-primary)}
-.warnred{color:var(--color-danger);font-weight:600}
-.dchead{display:flex;align-items:center;justify-content:center;margin:0 2px 10px}
-.dlabel{flex:1;border:1px solid var(--color-card-border);background:var(--color-card-bg);
- border-radius:var(--radius-tag);padding:7px 14px;font-size:13.5px;font-weight:600;
- color:var(--text-main);cursor:pointer;text-align:center}
-.strip{display:flex;gap:6px;overflow-x:auto;padding:2px 0 8px;-webkit-overflow-scrolling:touch;
- justify-content:space-between}
-.sday{flex:none;width:44px;text-align:center;cursor:pointer}
-.sday .swd{font-size:10.5px;color:var(--text-secondary);margin-bottom:3px}
-.sday .ring{position:relative;width:38px;height:38px;border-radius:50%;border:2.5px solid var(--color-divider);
- display:flex;align-items:center;justify-content:center;margin:0 auto;
- font-size:13px;color:var(--text-secondary);background:var(--color-card-bg)}
-.sday.has .ring{border-color:transparent;color:var(--text-main);font-weight:600}
-.sday.sel .ring{color:var(--color-primary);font-weight:700}
-.sday.today .ring{color:var(--color-primary);font-weight:700}
-.sday.sel .swd{color:var(--text-main);font-weight:600}
-.cxlink{color:var(--color-primary);cursor:pointer;text-decoration:underline;margin-left:10px}
-/* 日历sheet：手机100vw撑满（桌面收进430px居中）；高度由内容自适应、整月全显示不滚动；
-   顶部无圆角（贴视口顶），底部左右圆角 */
-.mback.top .sheet.cal{position:relative;width:100vw;max-width:430px;margin:0 auto;
- padding:10px 10px calc(14px + env(safe-area-inset-bottom));
- border-radius:0 0 var(--radius-xl) var(--radius-xl)}
-.calx{position:absolute;top:8px;right:8px;border:0;background:none;font-size:18px;
- color:var(--text-secondary);cursor:pointer;width:44px;height:44px;line-height:1}
-.calnav{display:flex;align-items:center;justify-content:center;gap:26px;margin:2px 0 14px}
-.calnav .navarrow{flex:none;width:44px;height:44px;border:0;background:none;font-size:22px;
- line-height:1;color:var(--text-main);cursor:pointer}
-.calnav b{flex:none;font-size:19px;font-weight:700;color:var(--text-main)}
-.calwd{display:grid;grid-template-columns:repeat(7,1fr);text-align:center;margin-bottom:8px}
-.calwd span{font-size:12px;color:var(--text-secondary)}
-.calgrid{display:grid;grid-template-columns:repeat(7,1fr);row-gap:6px}
-.calcell{display:flex;justify-content:center;padding:2px}
-/* 日期cell：最小44px热区（iOS规范）；按压scale(.94) 240ms ease-out。
-   默认态=深色清晰数字无圈（一眼可知可点），只有特殊态才上样式 */
-.cday{position:relative;width:100%;min-width:44px;max-width:56px;aspect-ratio:1;border-radius:50%;
- border:2.5px solid transparent;display:flex;align-items:center;justify-content:center;
- font-size:17px;color:var(--text-main);font-weight:600;cursor:pointer;background:transparent;
- transition:transform var(--dur-press) var(--ease-out),background var(--dur-fast) var(--ease-out)}
-.cday:active{transform:scale(.94)}
-@media(hover:hover){.cday:hover{background:var(--color-primary-soft)}}
-/* 状态严格区分：有记录=主色描边；选中=描边+浅主色底；今天=实心主色白字；
-   未来/溢出=浅灰禁用，pointer-events:none 禁一切交互响应 */
-/* 有记录=进度环（SVG叠加）；选中=浅主色底与环共存；今天=主色粗体数字（点与环重合已弃用） */
-.cring{position:absolute;inset:0;width:100%;height:100%}
-.cday.sel{background:var(--color-primary-soft);
- color:var(--color-primary);font-weight:700}
-.cday.today{color:var(--color-primary);font-weight:700}
-.cday.dis,.cday.out{color:var(--text-secondary);font-weight:400;opacity:.4;
- pointer-events:none;cursor:default}
-.callegend{display:flex;align-items:center;gap:14px;margin-top:10px;
- padding-top:10px;border-top:1px dashed var(--color-divider)}
-.callegend .lg{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;color:var(--text-secondary)}
-.lg-ring{width:13px;height:13px;border-radius:50%;border:2px solid var(--color-primary);box-sizing:border-box}
-.lg-today{color:var(--color-primary);font-weight:700;font-size:14px;line-height:1}
-.caltoday{margin-left:auto;border:0;background:var(--color-primary-soft);color:var(--color-primary);
- font-size:12.5px;font-weight:600;border-radius:var(--radius-tag);padding:7px 13px;cursor:pointer}
-.ring-track{stroke:var(--ring-bg)}
-.ring-fill{stroke:var(--ring-progress);transition:stroke-dashoffset var(--dur-base) var(--ease-out)}
-#avKcal{padding:16px 20px}
-.avitem{padding:10px 2px;border-bottom:1px solid var(--color-divider);
- display:flex;justify-content:space-between;gap:8px;align-items:baseline}
-.avitem:last-child{border-bottom:0}
-.avname b{font-size:14.5px;color:var(--text-main)}
-.avk{color:var(--color-primary);white-space:nowrap;font-size:13.5px;font-weight:600}
-.avbtns{position:fixed;bottom:0;left:0;right:0;margin:0 auto;max-width:430px;display:flex;gap:9px;
- padding:10px 12px calc(10px + env(safe-area-inset-bottom));background:var(--color-card-bg);
- border-top:1px solid var(--color-card-border);z-index:45}
-#avFix:disabled,#avSave:disabled{opacity:.55}
-#avFix{flex:1;background:var(--color-card-bg);border:1.5px solid var(--color-primary);
- color:var(--color-primary);border-radius:var(--radius-btn);padding:13px;
- font-size:var(--font-size-body);font-weight:600}
-#avSave{flex:2;background:var(--color-primary);color:#fff;border:0;border-radius:var(--radius-btn);
- padding:13px;font-size:var(--font-size-body);font-weight:600}
-.avload{padding:14px 0;text-align:center;color:var(--text-secondary);font-size:13.5px}
-/* ===== 弹层（遮罩/模态/抽屉）===== */
-.mback{position:fixed;inset:0;background:rgba(15,23,32,.45);display:none;align-items:flex-start;
- justify-content:center;padding:36px 12px;z-index:50;overflow-y:auto;
- -webkit-overflow-scrolling:touch;animation:fadeIn var(--dur-base) var(--ease-out)}
-.mback.up{align-items:flex-end;padding:0}
-.mback.closing{animation:fadeOut var(--dur-base) var(--ease-out) forwards}
-.modal{background:var(--color-card-bg);border:1px solid var(--color-card-border);border-radius:var(--radius-lg);
- max-width:430px;width:100%;padding:16px;box-shadow:var(--shadow-card);
- backdrop-filter:blur(var(--card-backdrop-blur));-webkit-backdrop-filter:blur(var(--card-backdrop-blur));
- animation:popIn var(--dur-base) var(--ease-out)}
-.mhead{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
-.mhead b{font-size:16px;color:var(--text-main)}
-.mhead button{border:0;background:var(--bar-track);border-radius:12px;width:36px;height:36px;
- font-size:15px;color:var(--text-secondary)}
-.tabs{display:flex;gap:6px;margin-bottom:14px}
-.tabs button{flex:1;padding:9px;border:1px solid var(--color-card-border);background:var(--color-card-bg);
- border-radius:10px;font-size:14px;color:var(--text-secondary)}
-.tabs button.on{background:var(--color-primary);border-color:var(--color-primary);color:#fff;font-weight:600}
-.panel{display:none}.panel.on{display:block}
-.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-.grid label{display:block;font-size:12px;color:var(--text-secondary);margin-bottom:3px}
-.grid input,.grid select{width:100%;border:1.5px solid var(--color-card-border);border-radius:10px;
- padding:9px 10px;font-size:14px;outline:none;background:var(--color-card-bg);color:var(--text-main)}
-.grid input:focus,.grid select:focus{border-color:var(--color-primary)}
-.save{width:100%;margin-top:12px;border:0;border-radius:var(--radius-btn);padding:12px;
- font-size:15px;font-weight:600;background:var(--color-primary);color:#fff;cursor:pointer}
-.mback.up .sheet{background:var(--color-card-bg);border:1px solid var(--color-card-border);
- border-radius:var(--radius-lg) var(--radius-lg) 0 0;max-width:430px;width:100%;
- padding:16px 16px calc(16px + env(safe-area-inset-bottom));transform:translateY(100%);
- transition:transform var(--dur-base) var(--ease-out);
- backdrop-filter:blur(var(--card-backdrop-blur));-webkit-backdrop-filter:blur(var(--card-backdrop-blur))}
-.mback.up.open .sheet{transform:translateY(0)}
-.mback.top{align-items:flex-start;padding:0}
-.mback.top .sheet{background:var(--color-solid);border-radius:0 0 var(--radius-lg) var(--radius-lg);transform:translateY(-100%)}
-.mback.top.open .sheet{transform:translateY(0)}
-.mback.top.closing .sheet{transform:translateY(-100%)}
-.etitle{text-align:center;font-size:16px;font-weight:700;margin-bottom:12px;color:var(--text-main)}
-.ehead{display:flex;align-items:center;gap:10px;margin-bottom:6px}
-.ethumb{width:56px;height:56px;border-radius:14px;object-fit:cover;background:var(--bar-track);cursor:pointer}
-.ethumb.ph{display:flex;align-items:center;justify-content:center;font-size:22px}
-.ehint{font-size:11.5px;color:var(--text-secondary)}
-.elabel{font-size:12.5px;color:var(--text-secondary);margin:9px 2px 5px}
-.einput{width:100%;box-sizing:border-box;border:1.5px solid var(--color-divider);border-radius:12px;
- padding:11px 12px;font-size:14.5px;outline:none;background:var(--color-solid);color:var(--text-main)}
-.einput:focus{border-color:var(--color-primary)}
-.pills{display:flex;gap:8px;flex-wrap:wrap}
-.pills button{padding:8px 16px;border-radius:var(--radius-tag);border:1.5px solid var(--color-card-border);
- background:var(--color-card-bg);font-size:13.5px;color:var(--text-secondary)}
-.pills button.on{border-color:var(--color-primary);background:var(--color-primary-soft);
- color:var(--color-primary);font-weight:600}
-.ebtns{display:flex;gap:10px;margin-top:14px}
-.ebtns .ghost{flex:1;border:0;background:var(--bar-track);border-radius:var(--radius-btn);padding:12px;
- font-size:15px;color:var(--text-secondary)}
-.ebtns .primary{flex:2;border:0;background:var(--color-primary);color:#fff;border-radius:var(--radius-btn);
- padding:12px;font-size:15px;font-weight:600}
-.ebtns .danger{background:var(--color-danger)}
-.dtext{text-align:center;font-size:14.5px;padding:6px 0 14px}
-.fixphotoline{display:flex;align-items:center;gap:8px;margin-bottom:8px}
-#fixPhotoBtn{border:1.5px solid var(--color-card-border);background:var(--color-card-bg);
- border-radius:10px;padding:8px 10px;font-size:13px;color:var(--text-main)}
-#fixThumb{width:42px;height:42px;border-radius:8px;object-fit:cover}
-#fixText{width:100%;height:110px;border:1.5px solid var(--color-divider);border-radius:12px;padding:12px;
- font-size:14px;resize:vertical;background:var(--color-card-bg);outline:none;box-sizing:border-box;color:var(--text-main)}
-#fixText:focus{border-color:var(--color-primary)}
-.fixcnt{text-align:right;font-size:12px;color:var(--text-secondary);margin-top:4px}
-.fixerr{display:none;margin-top:8px;padding:8px 10px;background:var(--color-danger-soft);
- border-left:3px solid var(--color-danger);color:var(--color-danger);font-size:12.5px;border-radius:6px;word-break:break-all}
-.fixerr.show{display:block}
-button{transition:transform .12s;font-family:var(--font-family)}
-@media (prefers-reduced-motion:reduce){
- *,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}
-}
-.btnrow button:active,.pills button:active,.seg button:active,.save:active,.ebtns button:active,
- #avSave:active,#avFix:active,.gear:active,.delzone2:active{transform:scale(.95);opacity:.85}
-/* 骨架屏：shimmer 用 track/solid token，1.4s 无限循环 */
-.skel{background:linear-gradient(90deg,var(--bar-track) 25%,var(--color-solid) 50%,var(--bar-track) 75%);
- background-size:200% 100%;animation:shimmer 1.4s linear infinite;border-radius:8px}
-@keyframes shimmer{to{background-position:-200% 0}}
-#av,.mback{-webkit-overflow-scrolling:touch}
-#av{animation:fadeIn .2s}
-</style></head><body>
-<div class="view" data-theme="home" id="homeView">
-<div class="hd"><h1>🍱 减肥管家</h1>
- <div style="display:flex;gap:6px;align-items:center">
-  <div class="seg"><button id="u1"></button><button id="u2"></button></div>
-  <button class="gear" id="gear" title="身体档案设置">⚙️</button>
-  <button class="gear" id="themeBtn" title="切换全局主题">🧊</button>
- </div></div>
-<div class="dchead">
- <button class="dlabel" id="dLabel">今天</button>
-</div>
-<div class="strip" id="strip"></div>
-<div class="card">
- <div class="muted">今日剩余</div>
- <div class="num"><span id="remain">–</span><small>kcal</small></div>
- <div class="bar" id="bar"><i></i></div>
- <div class="sumline" id="sumline"></div>
- <div class="dinnerline" id="dinner"></div></div>
-<div class="card">
- <input type="text" id="text" placeholder="说一句吃了啥，如：早上吃了一根烤肠" autocomplete="off">
- <div class="btnrow">
-  <button class="photo" id="bPhoto">📷 拍照记录</button>
-  <button class="send" id="bSend">发送</button></div>
- <input type="file" id="photo" accept="image/*" capture="environment" style="display:none">
- <div id="reply"></div></div>
-<div class="card" id="wkCard" style="display:none"></div>
-<div class="card"><div style="display:flex;justify-content:flex-end;margin-bottom:6px">
- <button id="clearBtn" style="border:1px solid var(--color-danger-border);background:var(--color-danger-soft);color:var(--color-danger);font-size:12.5px;font-weight:600;border-radius:var(--radius-tag);padding:6px 14px;cursor:pointer;display:none">清空</button></div>
-<div id="list"></div></div>
-<div class="mback top" id="calBack" style="display:none">
- <div class="sheet cal">
-  <button id="calClose" class="calx" aria-label="关闭">✕</button>
-  <div class="calnav">
-   <button id="calPrevM" class="navarrow" aria-label="上个月">‹</button>
-   <b id="calTitle">2026年10月</b>
-   <button id="calNextM" class="navarrow" aria-label="下个月">›</button>
-  </div>
-  <div class="calwd"><span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span><span>日</span></div>
-  <div class="calgrid" id="calGrid"></div>
-  <div class="callegend"><span class="lg"><b class="lg-today">28</b>今天</span><span class="lg"><span class="lg-ring"></span>已有记录</span><button id="calToday" class="caltoday">回到今天</button></div>
- </div></div>
-<div class="mback up" id="editBack" style="display:none">
- <div class="sheet">
-  <div class="mhead"><b>编辑食物</b><button id="eClose">✕</button></div>
-  <div class="ehead">
-   <img id="eThumb" class="ethumb" alt="" style="display:none">
-   <div class="ethumb ph" id="eThumbPh" role="img" aria-label="暂无照片"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M4 13h16"/><path d="M5 13a7 7 0 0 0 14 0z"/><path d="M9 13V9h6v4"/></svg></div>
-   <div class="ehint">点头像可更换这张照片</div>
-   <input type="file" id="ePhoto" accept="image/*" style="display:none">
-  </div>
-  <div class="elabel">食物名称</div>
-  <input class="einput" id="eFood">
-  <div class="elabel">食用克重（改这里，热量/蛋白自动按比例更新）</div>
-  <input class="einput" id="ePortion">
-  <div class="elabel">热量 kcal</div>
-  <input class="einput" id="eKcal" type="number">
-  <div class="elabel">蛋白 g（可选）</div>
-  <input class="einput" id="eProtein" type="number">
-  <div class="elabel">餐段</div>
-  <div class="pills" id="ePills"></div>
-  <div class="ebtns"><button class="ghost" id="eCancel">取消</button><button class="primary" id="eSave">保存修改</button></div>
- </div></div>
-<div class="mback" id="clearBack" style="display:none">
- <div class="modal" style="max-width:320px">
-  <div class="etitle">确定清空该日的全部记录吗？</div>
-  <div class="muted" style="text-align:center;font-size:12px;padding-bottom:10px">清空的是当前所选日期，不可恢复（含当日全部条目与照片）</div>
-  <div class="ebtns"><button class="ghost" id="cCancel">取消</button><button class="primary danger" id="cOk">清空</button></div>
- </div></div>
-<div class="mback" id="mback">
- <div class="modal">
-  <div class="mhead"><b>设置</b><button id="mclose">✕</button></div>
-  <div class="tabs"><button class="tab on" id="tProfile">👤 个人信息</button><button class="tab" id="tGeneral">⚙️ 通用</button><button class="tab" id="tPlan" style="display:none">🏋️ 训练计划</button></div>
-  <div class="panel on" id="pProfile">
-   <div class="muted" style="margin-bottom:9px">保存后自动按 Mifflin-St Jeor 重算热量线</div>
-   <div class="grid">
-    <div><label>名称</label><input type="text" id="s_name"></div>
-    <div><label>性别</label><select id="s_gender"><option value="male">男</option><option value="female">女</option></select></div>
-    <div><label>年龄</label><input type="number" id="s_age"></div>
-    <div><label>身高 cm</label><input type="number" id="s_height"></div>
-    <div><label>体重 kg</label><input type="number" step="0.1" id="s_weight"></div>
-    <div><label>目标体重 kg</label><input type="number" step="0.1" id="s_targetw"></div>
-    <div><label>周练天数</label><input type="number" min="0" max="7" id="s_days"></div>
-   </div>
-   <div class="elabel" style="margin-top:12px">减脂缺口（每天少吃的量）</div>
-   <div class="num" style="font-size:26px;margin:0 0 6px"><span id="s_defval">350</span><small> kcal</small></div>
-   <input type="range" id="s_deficit" min="0" max="750" step="25" value="350" style="width:100%;accent-color:var(--color-primary)">
-   <div class="svals"><span>0 维持</span><span>温和 350</span><span>标准 500</span><span>激进 750</span></div>
-   <div class="calcbox" id="calcBox"></div>
-   <button class="save" id="s_save">💾 保存并重算</button>
-   <div class="muted" id="s_hint" style="margin-top:9px"></div>
-  </div>
-  <div class="panel" id="pGeneral">
-   <label style="display:flex;align-items:flex-start;gap:9px;cursor:pointer;padding:4px 2px">
-    <input type="checkbox" id="mockChk" style="width:17px;height:17px;margin-top:2px">
-    <span style="font-size:13.5px">测试模式<br><span class="muted" style="font-size:11.5px">识别立即返回示例数据，不请求大模型（用于测试界面与入库流程）</span></span></label>
-  </div>
-  <div class="panel" id="pPlan">
-   <div class="muted" style="margin-bottom:6px">把你的每周训练计划文本粘贴到这里（例：周一 胸 卧推4x12 飞鸟3x15；周三 背 杠铃划船4x10……），AI 解析成结构化计划。已存计划会被覆盖。</div>
-   <textarea id="pText" maxlength="2000" placeholder="周一 胸 卧推4x12 飞鸟3x15&#10;周三 背 杠铃划船4x10&#10;周五 腿 深蹲4x12……" style="width:100%;height:130px;box-sizing:border-box;border:1.5px solid var(--color-card-border);border-radius:12px;padding:11px 12px;font-size:14px;outline:none;background:var(--color-card-bg);color:var(--text-main);resize:vertical;font-family:var(--font-family)"></textarea>
-   <div class="ebtns"><button class="ghost" id="pParse">🔍 解析预览</button><button class="primary" id="pSaveP">💾 保存计划</button></div>
-   <div class="muted" id="pPrev" style="margin-top:9px;white-space:pre-wrap;font-size:12px"></div>
-  </div>
- </div></div>
-</div>
-<div class="view" data-theme="meal" id="av">
- <div class="avbar">
-  <button id="avBack" aria-label="返回"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5"/><path d="m12 19-7-7 7-7"/></svg></button>
-  <button id="avMeal"></button>
-  <div style="width:34px"></div>
- </div>
- <div id="avmenu"></div>
- <div class="avwrap">
-  <div class="card card--image"><img id="avImg" class="card__image" alt="餐食照片"></div>
-  <div class="card" id="avKcal"></div>
-  <div class="avmrow3" id="avM"></div>
-  <div class="card" id="avItems"></div>
- </div>
- <div class="avbtns"><button id="avFix">✏️ AI 修正</button><button id="avSave" class="btn-primary">💾 保存记录</button></div>
- <div class="mback" id="fixBack" style="display:none">
-  <div class="modal">
-   <div class="mhead"><b>AI 修正结果</b><button id="fixClose">✕</button></div>
-   <div class="muted" style="margin-bottom:8px">例：图里的不是鸡蛋是鸭蛋｜只吃了一半，热量减半｜这是中午那盘的剩余，扣回</div>
-   <div class="fixphotoline"><button type="button" id="fixPhotoBtn">📷 传吃剩的照片</button><img id="fixThumb" style="display:none" alt=""><span class="muted" id="fixPhotoHint">可选：拍剩余的盘子，AI 按图扣减</span></div>
-   <input type="file" id="fixPhoto" accept="image/*" capture="environment" style="display:none">
-   <textarea id="fixText" maxlength="200" placeholder="告诉 AI 需要修正的部分，会重新分析"></textarea>
-   <div class="fixcnt" id="fixCnt">0/200</div>
-   <button class="save" id="fixOk">确定</button>
-   <div class="fixerr" id="fixErr"></div>
-  </div></div>
-</div>
-<div id="toast"></div>
+# ---------------------------------------------------------------- 页面（静态文件，见 code/web/）
+WEB_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "web")
+def _load_web(name):
+    with open(os.path.join(WEB_DIR, name), "rb") as f:
+        return f.read()
 
-<script>
-const $=id=>document.getElementById(id);
-window.onerror=function(m){try{toast("页面错误:"+m);}catch(_){}};
-let user=localStorage.getItem("fg_user")||"beifeng";
-function paintSeg(){$("u1").classList.toggle("on",user==="beifeng");$("u2").classList.toggle("on",user==="gagayouna");}
-$("u1").textContent="🧑 邶风";$("u2").textContent="👩 gagayouna";
-$("u1").onclick=()=>{user="beifeng";localStorage.setItem("fg_user",user);paintSeg();clearReply();$("list").removeAttribute("data-ready");monthDays={};monthFetched={};CAL_TARGET=0;refresh();if($("mback").style.display==="flex")loadProfile();};
-$("u2").onclick=()=>{user="gagayouna";localStorage.setItem("fg_user",user);paintSeg();clearReply();$("list").removeAttribute("data-ready");monthDays={};monthFetched={};CAL_TARGET=0;refresh();if($("mback").style.display==="flex")loadProfile();};
-function clearReply(){const el=$("reply");el.className="";el.textContent="";
- if(timer)clearInterval(timer);timer=null;suppress=true;busy=false;
- $("bPhoto").disabled=false;$("bSend").disabled=false;}
-function showBack(id){const el=$(id);el.style.display="flex";el.classList.remove("closing");}
-function hideBack(id){const el=$(id);el.classList.add("closing");
- setTimeout(()=>{el.style.display="none";el.classList.remove("closing");},260);}
-// iOS手势关闭：dir=1 底部抽屉下拉关闭；dir=-1 顶部sheet上推关闭（对齐iOS下拉面板惯例）。
-// 拖拽>90px 松手关闭，否则回弹；dir=-1 时内容滚到顶才响应，避免与内部滚动冲突
-function enableDragClose(sheet,back,onClose,dir){
- let sy=0,d=0,drag=false;
- sheet.addEventListener("touchstart",e=>{
-  if(back.style.display!=="flex"||back.classList.contains("closing"))return;
-  sy=e.touches[0].clientY;d=0;drag=true;sheet.style.transition="none";},{passive:true});
- sheet.addEventListener("touchmove",e=>{
-  if(!drag)return;
-  if(dir<0&&sheet.scrollTop>2)return; // 内部还在滚动 → 不触发手势
-  d=(e.touches[0].clientY-sy)*dir;
-  if(d>0)sheet.style.transform="translateY("+(d*dir)+"px)";},{passive:true});
- sheet.addEventListener("touchend",()=>{
-  if(!drag)return;drag=false;sheet.style.transition="";
-  if(d>90){sheet.style.transform="";onClose();}
-  else sheet.style.transform="";},{passive:true});
-}
-enableDragClose($("editBack").querySelector(".sheet"),$("editBack"),closeEdit,1);
-enableDragClose($("calBack").querySelector(".sheet"),$("calBack"),closeCal,-1);
-function applyTheme(t){document.querySelectorAll("[data-theme]").forEach(v=>v.setAttribute("data-theme",t));
- $("themeBtn").textContent=t==="meal"?"🌿":"🧊";localStorage.setItem("fg_theme",t);}
-$("themeBtn").onclick=()=>applyTheme(localStorage.getItem("fg_theme")==="meal"?"home":"meal");
-applyTheme(localStorage.getItem("fg_theme")||"home");
-function openSettings(){showBack("mback");loadProfile();
- api("/api/mockcfg").then(j=>{$("mockChk").checked=!!j.mock;}).catch(()=>{});}
-$("mockChk").onchange=async e=>{const on=e.target.checked;
- try{const j=await api("/api/mockcfg",{method:"POST",headers:{"Content-Type":"application/json"},
-  body:JSON.stringify({mock:on})},15000);
-  toast(j.mock?"测试模式开：识别返回示例数据":"测试模式关：恢复真实识别");}
- catch(err){toast("切换失败："+err.message);e.target.checked=!on;}};
-function closeSettings(){hideBack("mback");}
-$("gear").onclick=openSettings;
-$("mclose").onclick=closeSettings;
-$("mback").onclick=e=>{if(e.target.id==="mback")closeSettings();};
-$("tProfile").onclick=()=>{$("tProfile").classList.add("on");$("tGeneral").classList.remove("on");
- $("pProfile").classList.add("on");$("pGeneral").classList.remove("on");};
-$("tGeneral").onclick=()=>{$("tGeneral").classList.add("on");$("tProfile").classList.remove("on");
- $("pGeneral").classList.add("on");$("pProfile").classList.remove("on");};
-function showPTab(tabId,panelId){["tProfile","tGeneral","tPlan"].forEach(t=>$(t).classList.toggle("on",t===tabId));
- ["pProfile","pGeneral","pPlan"].forEach(p=>$(p).classList.toggle("on",p===panelId));}
-$("tPlan").onclick=()=>{showPTab("tPlan","pPlan");loadPlanView();};
-let curPlan={days:[]};
-async function loadPlanView(){
- try{const p=await api("/api/plan?user="+user);
-  curPlan=p&&p.days?p:{days:[]};
-  $("pPrev").textContent=curPlan.days.length?
-   "当前计划（保存新的会覆盖）：\n"+curPlan.days.map(d=>d.dow+"："+d.parts.map(x=>x.name+(x.sets_reps?" "+x.sets_reps:"")).join("、")).join("\n")
-   :"还没有训练计划";
- }catch(e){$("pPrev").textContent="读取失败："+e.message;}
-}
-$("pParse").onclick=async()=>{
- const t=$("pText").value.trim();if(!t){toast("先粘贴计划文本");return;}
- $("pParse").disabled=true;$("pPrev").textContent="解析中…";
- try{const j=await api("/api/plan/parse",{method:"POST",headers:{"Content-Type":"application/json"},
-  body:JSON.stringify({user:user,text:t})},120000);
-  if(j.days&&j.days.length){$("pPrev").textContent="解析结果预览：\n"+j.days.map(d=>d.dow+"："+d.parts.map(x=>x.name+(x.sets_reps?" "+x.sets_reps:"")).join("、")).join("\n")+"\n\n确认无误后点「保存计划」";}
-  else{$("pPrev").textContent="⚠️ 没解析出内容，检查文本格式（每行：星期 动作 组次）";}
- }catch(e){$("pPrev").textContent="解析失败："+e.message;}
- $("pParse").disabled=false;
-};
-let curParsed=null;
-$("pSaveP").onclick=async()=>{
- if(!curParsed){toast("先点「解析预览」生成计划");return;}
- $("pSaveP").disabled=true;
- try{const j=await api("/api/plan",{method:"POST",headers:{"Content-Type":"application/json"},
-  body:JSON.stringify({user:user,plan:curParsed})},60000);
-  curPlan={days:j.days||[]};
-  toast("已保存 "+curPlan.days.length+" 天计划");loadPlanView();
- }catch(e){toast("保存失败："+e.message);}
- $("pSaveP").disabled=false;
-};
-async function loadProfile(){
- try{const p=await api("/api/profile?user="+user);
-  $("s_name").value=p.display_name||"";$("s_gender").value=p.gender||"male";
-  $("s_age").value=p.age??"";$("s_height").value=p.height_cm??"";
-  $("s_weight").value=p.weight_kg??"";$("s_targetw").value=p.target_weight_kg??"";
-  $("s_days").value=p.training_days??4;
-  $("s_deficit").value=p.deficit??350;
-  updateCalc();
-  const t=p.targets||{};
-  $("s_hint").textContent="当前热量线 "+(t.daily_kcal??"?")+" kcal / 蛋白 "+(t.protein_g??"?")+"g（"+(t.calculated_at||"")+" 算）";
- }catch(e){toast("读取档案失败："+e.message);}
-}
-$("s_save").onclick=async()=>{
- try{const j=await api("/api/profile",{method:"POST",headers:{"Content-Type":"application/json"},
-  body:JSON.stringify({user:user,display_name:$("s_name").value,gender:$("s_gender").value,
-   age:$("s_age").value,height_cm:$("s_height").value,weight_kg:$("s_weight").value,
-   target_weight_kg:$("s_targetw").value,training_days:$("s_days").value,deficit:$("s_deficit").value})});
-  const btn=user==="beifeng"?$("u1"):$("u2");
-  btn.textContent=(user==="beifeng"?"🧑 ":"👩 ")+($("s_name").value.trim()||user);
-  toast("已保存，热量线 "+j.targets.daily_kcal+" kcal / 蛋白 "+j.targets.protein_g+"g");
-  $("s_hint").textContent="当前热量线 "+j.targets.daily_kcal+" kcal / 蛋白 "+j.targets.protein_g+"g（刚重算）";
-  refresh();
- }catch(e){toast("保存失败："+e.message);}
-};
-paintSeg();
-const esc=s=>String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
-let TOKEN=localStorage.getItem("fg_token")||"";
-async function api(path,opts,tmo,retried){const ctl=("AbortController"in window)?new AbortController():null;
- const to=ctl?setTimeout(()=>ctl.abort(),tmo||180000):null;
- if(ctl&&opts&&opts.signal)opts.signal.addEventListener("abort",()=>ctl.abort());
- activeCtl=ctl;
- const h=Object.assign({},(opts&&opts.headers)||{});
- if(TOKEN)h["X-Access-Token"]=TOKEN;
- try{const r=await fetch(path,Object.assign({},opts,{headers:h},ctl?{signal:ctl.signal}:{}));
-  let j=null;try{j=await r.json()}catch(_){}
-  if(r.status===401&&!retried){const c=prompt("此站受访问码保护，请输入访问码：");
-   if(c){TOKEN=c;localStorage.setItem("fg_token",c);return api(path,opts,tmo,true);}}
-  if(!r.ok)throw new Error((j&&j.error)||("HTTP "+r.status));return j;}
- finally{if(to)clearTimeout(to);}}
-let busy=false,timer=null,suppress=false,activeCtl=null;
-let viewDate=null,monthDays={},monthFetched={},CAL_TARGET=0; // monthDays按用户切换时清空（避免串数据）
-function invalidateMonthCache(){monthFetched={};} // 记录/删除/清空后调用，否则环的月度聚合是死缓存
-function ringSvg(pct){ // 进度环组件：viewBox 44 自适应容器；弧封顶100%，dashoffset 纯CSS过渡
- const R=19,SW=3,C=2*Math.PI*R,off=C*(1-Math.min(100,Math.max(0,pct))/100);
- return "<svg class='cring' viewBox='0 0 44 44' aria-hidden='true'>"+
-  "<circle class='ring-track' cx='22' cy='22' r='"+R+"' fill='none' stroke-width='"+SW+"'/>"+
-  "<circle class='ring-fill' cx='22' cy='22' r='"+R+"' fill='none' stroke-width='"+SW+"' stroke-linecap='round'"+
-  " stroke-dasharray='"+C+"' stroke-dashoffset='"+off+"' transform='rotate(-90 22 22)'/></svg>";
-}
-function todayStr(){return new Date().toISOString().slice(0,10);}
-function labelFor(ds){const t=todayStr();
- if(ds===t)return"今天";
- const y=dstrShift(t,-1);if(ds===y)return"昨天";
- const d=new Date(ds+"T12:00:00");
- return (d.getMonth()+1)+"月"+d.getDate()+"日 "+["周日","周一","周二","周三","周四","周五","周六"][d.getDay()];}
-function dstrShift(base,n){const d=new Date((base||todayStr())+"T12:00:00");d.setDate(d.getDate()+n);return d.toISOString().slice(0,10);}
-function setViewDate(ds){if(ds>todayStr())ds=todayStr();
- viewDate=(ds===todayStr())?null:ds;renderDateHead();refresh();}
-let calY=0,calM=0;
-function openCal(){const b=viewDate||todayStr();calY=+b.slice(0,4);calM=+b.slice(5,7);
- showBack("calBack");requestAnimationFrame(()=>$("calBack").classList.add("open"));renderCal();}
-function closeCal(){$("calBack").classList.remove("open");hideBack("calBack");}
-$("dLabel").onclick=openCal;
-$("calClose").onclick=closeCal;
-$("calBack").onclick=e=>{if(e.target.id==="calBack")closeCal();};
-$("calPrevM").onclick=()=>{calM--;if(calM<1){calM=12;calY--;}
- ensureMonth(calY+"-"+String(calM).padStart(2,"0"));renderCal();};
-$("calNextM").onclick=()=>{calM++;if(calM>12){calM=1;calY++;}
- ensureMonth(calY+"-"+String(calM).padStart(2,"0"));renderCal();};
-$("calToday").onclick=()=>{const td=todayStr();
- setViewDate(td);calY=+td.slice(0,4);calM=+td.slice(5,7);
- ensureMonth(td.slice(0,7));renderCal();closeCal();};
-function renderCal(){
- $("calTitle").textContent=calY+"年"+calM+"月";
- const first=new Date(calY,calM-1,1);
- let lead=first.getDay()-1;if(lead<0)lead=6;
- const dim=new Date(calY,calM,0).getDate();
- const prevDim=new Date(calY,calM-1,0).getDate();
- const t=todayStr();const sel=viewDate||todayStr();
- let h="";
- for(let i=0;i<lead;i++) // 上月溢出日期：浅灰弱化、不可点
-  h+="<div class='calcell'><div class='cday out'>"+(prevDim-lead+1+i)+"</div></div>";
- for(let d=1;d<=dim;d++){
-  const ds=calY+"-"+String(calM).padStart(2,"0")+"-"+String(d).padStart(2,"0");
-  const future=ds>t;
-  const md=monthDays[ds]||{},has=md.n>0;
-  const pct=has&&CAL_TARGET?md.eaten/CAL_TARGET*100:0;
-  const cls="cday"+(has?" has":"")+(future?" dis":"")+(ds===sel?" sel":"")+(ds===t?" today":"");
-  h+="<div class='calcell'><div class='"+cls+"' data-d='"+ds+"'>"+(has?ringSvg(pct):"")+d+"</div></div>";
- }
- const trail=(7-(lead+dim)%7)%7;
- for(let i=1;i<=trail;i++) // 下月溢出补满整周
-  h+="<div class='calcell'><div class='cday out'>"+i+"</div></div>";
- $("calGrid").innerHTML=h;
- $("calGrid").querySelectorAll(".cday:not(.dis):not(.out)").forEach(c=>c.onclick=()=>{
-  setViewDate(c.dataset.d);hideBack("calBack");}); // 选中历史日期→加载当日记录并关闭
-}
-function renderDateHead(){
- $("dLabel").textContent=labelFor(viewDate||todayStr())+" ▾";
- $("clearBtn").style.display="";} // 清空跟随所选日期（后端已支持 date），历史日期也可清
-$("dLabel").onclick=openCal;
-const photoUrls={};
-async function loadThumb(id,img,uid){
- if(photoUrls[id]){img.src=photoUrls[id];return;} // blob缓存命中直接复用，切日期不重拉
- try{const r=await fetch("/photo/"+id+(uid?"?user="+uid:""),TOKEN?{headers:{"X-Access-Token":TOKEN}}:{});
-  if(!r.ok){img.style.display="none";return;}
-  const b=await r.blob();
-  photoUrls[id]=URL.createObjectURL(b);img.src=photoUrls[id];
-  const ks=Object.keys(photoUrls); // 上限50张：LRU淘汰，防翻历史内存无限涨
-  if(ks.length>50){URL.revokeObjectURL(photoUrls[ks[0]]);delete photoUrls[ks[0]];}
- }catch(e){img.style.display="none";}
-}
-function setLoading(msg){busy=true;$("bPhoto").disabled=true;$("bSend").disabled=true;
- suppress=false;
- const el=$("reply"),t0=Date.now();el.className="wait";
- el.innerHTML="<span class='spin'></span>"+msg+" <b id='el'></b>"+
-  "<span class='cxlink' onclick='cancelWait()'>取消等待</span>";
- timer=setInterval(()=>{const el=$("el");if(!el){if(timer)clearInterval(timer);return;}
-  const s=Math.round((Date.now()-t0)/1000);
-  el.textContent=s+"s"+(s>12?" · 大图高峰会慢些":"");},500);}
-function done(){busy=false;$("bPhoto").disabled=false;$("bSend").disabled=false;if(timer)clearInterval(timer);}
-let sendCtl=null;
-function cancelWait(){if(activeCtl)activeCtl.abort();}
-function showOk(t){done();if(suppress)return;const el=$("reply");el.className="ok";el.textContent=t;}
-function showErr(t){done();if(suppress)return;const el=$("reply");el.className="err";el.textContent="❌ "+t;}
-function toast(t){const el=$("toast");el.textContent=t;el.classList.add("show");
- setTimeout(()=>el.classList.remove("show"),2200);}
-const MEAL_ORD={"早餐":0,"午餐":1,"晚餐":2,"加餐":3};
-function listSkeleton(){ // 明细卡骨架屏：首屏/切用户时替代转圈，数据到后整体覆盖
- const row="<div style='display:flex;align-items:center;gap:10px;padding:8px'>"+
-  "<div class='skel' style='width:48px;height:48px;border-radius:12px;flex:none'></div>"+
-  "<div style='flex:1'><div class='skel' style='height:14px;width:60%;margin-bottom:8px'></div>"+
-  "<div class='skel' style='height:11px;width:35%'></div></div>"+
-  "<div class='skel' style='width:44px;height:13px'></div></div>";
- const card="<div class='card gcard'><div class='skel' style='height:16px;width:38%;margin-bottom:10px'></div>"+row+row+"</div>";
- $("list").innerHTML=card+card;
-}
-let refreshSeq=0;
-async function refresh(){
- const seq=++refreshSeq; // 竞态守卫：快速切日期时旧响应后到会被丢弃，防止旧数据覆盖新选择
- if(!$("list").dataset.ready)listSkeleton();
- try{const j=await api("/api/today?user="+user+(viewDate?"&date="+viewDate:""));
-  if(seq!==refreshSeq)return;
-  renderHero(j);renderDetail(j);$("list").dataset.ready=1;}
- catch(e){if(seq===refreshSeq)toast("加载失败："+e.message);}
- renderStrip();renderDateHead(); // 用本地缓存即时渲染周条/日期头，不等网络
- try{const pl=await api("/api/plan?user="+user);
-  const w=await api("/api/workouts?user="+user);
-  if(seq!==refreshSeq)return;
-  renderWK(pl,w.records||[]);
- }catch(e){}
- await Promise.all([ensureMonth(todayStr()),ensureMonth(dstrShift(todayStr(),-7))]); // 补拉上月：周条跨月天有环数据
- renderStrip();
-}
-function countUp(el,to){ // 剩余热量数字平滑过渡：300ms ease-out（rAF三次缓出），避免数值跳变
- const from=parseInt(el.textContent,10)||0;if(from===to){el.textContent=to;return;}
- const t0=performance.now(),dur=300;
- const step=t=>{const p=Math.min(1,(t-t0)/dur),e=1-Math.pow(1-p,3);
-  el.textContent=Math.round(from+(to-from)*e);
-  if(p<1)requestAnimationFrame(step);};
- requestAnimationFrame(step);}
-function renderHero(j){
- CAL_TARGET=j.target||CAL_TARGET; // 环形比例的分母（当日目标热量）
- countUp($("remain"),j.remaining);
- $("remain").classList.toggle("over",j.remaining<0);
- const pct=Math.max(0,Math.min(100,j.target?j.eaten/j.target*100:0));
- const bar=$("bar");bar.classList.toggle("warn",pct>85);
- bar.firstElementChild.style.width=pct+"%";
- $("sumline").textContent=(j.remaining<0?"⚠️ 已超出 "+(-j.remaining)+" 千卡 ｜ ":"")
-  +"已吃 "+j.eaten+" / "+j.target+" kcal ｜ 蛋白 "+j.protein+" / "+j.protein_target+" g";
- const d=$("dinner");d.textContent=j.dinner_tip?("🌙 "+j.dinner_tip):"";d.classList.toggle("show",!!j.dinner_tip);
-}
-function renderDetail(j){
- _recs={};j.records.forEach(r=>_recs[r.id]=r);
- const RAT={"早餐":0.25,"午餐":0.35,"晚餐":0.30,"加餐":0.10};
- const sug=m=>{const t=(j.target||0)*(RAT[m]||0);
-  return (Math.round(t*0.85/5)*5)+" ~ "+(Math.round(t*1.15/5)*5);};
- const recs=[...j.records].sort((a,b)=>(MEAL_ORD[a.meal_type]??9)-(MEAL_ORD[b.meal_type]??9));
- const groups=[];let cur=null;
- for(const r of recs){
-  if(!cur||cur.m!==r.meal_type){cur={m:r.meal_type,items:[],tot:0};groups.push(cur);}
-  cur.items.push(r);cur.tot+=r.kcal||0;
- }
- const GEMO={"早餐":"☀️","午餐":"🌤️","晚餐":"🌙","加餐":"🍪"};
- let h="";
- for(const g of groups){
-  h+="<div class='card gcard'><div class='ghead'>"+
-   "<span class='gh-emoji'>"+(GEMO[g.m]||"🍽️")+"</span><span class='gh-name'>"+esc(g.m)+"</span>"+
-   "<div class='gh-tot'><small>本餐合计</small><b>"+g.tot+" 千卡</b></div></div>"+
-   "<div class='gsug'>热量建议："+sug(g.m)+" kcal</div>";
-  for(const r of g.items){
-   h+="<div class='mrow' data-id='"+r.id+"'>"+
-    "<div class='dz'><button class='delzone2' data-del='"+r.id+"' aria-label='删除"+esc(r.food)+"'>删除</button></div>"+
-    "<div class='mmain'>"+
-    (r.photo?"<img class='thumb' data-photo='"+r.id+"' alt=''>":"<div class='thumb ph' role='img' aria-label='暂无照片'>" +
-    "<svg width='26' height='26' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='1.6' stroke-linecap='round' aria-hidden='true'><path d='M4 13h16'/><path d='M5 13a7 7 0 0 0 14 0z'/></svg></div>")+
-    "<div class='mname'>"+esc(r.food)+"<div class='msub'>"+
-    [r.portion,r.note].filter(Boolean).map(esc).join(" · ")+"</div></div>"+
-    "<div class='kcell'><b>"+r.kcal+"</b> 千卡<span class='chev'>›</span></div></div></div>";
-  }
-  h+="</div>";
- }
- $("list").innerHTML=h||"<div class='muted' style='padding:8px 0'>这一天还没有记录</div>";
- document.querySelectorAll("#list img[data-photo]").forEach(im=>loadThumb(im.dataset.photo,im,user));
- bindSwipe($("list"));
-}
-let openId=null,suppressClick=false,_recs={};
-function closeOpen(exceptId){document.querySelectorAll("#list .mrow").forEach(row=>{
- if(+row.dataset.id!==exceptId){row.querySelector(".mmain").style.transform="";row.classList.remove("open");}});
- if(exceptId==null)openId=null;}
-function bindSwipe(list){
- list.querySelectorAll(".mrow").forEach(row=>{
-  const rid=+row.dataset.id,main=row.querySelector(".mmain");
-  let sx=0,sy=0,drag=false,moved=false,cap=false;
-  main.addEventListener("pointerdown",e=>{sx=e.clientX;sy=e.clientY;drag=true;moved=false;cap=false;main.style.transition="none";});
-  main.addEventListener("pointermove",e=>{if(!drag)return;
-   const dx=e.clientX-sx,dy=e.clientY-sy;
-   if(!moved&&Math.abs(dx)>8&&Math.abs(dx)>Math.abs(dy)){
-    moved=true;suppressClick=true;setTimeout(()=>suppressClick=false,350);
-    try{main.setPointerCapture(e.pointerId);}catch(_){}}
-   if(!moved)return;
-   const base=openId===rid?-72:0;
-   main.style.transform="translateX("+Math.max(-72,Math.min(0,base+dx))+"px)";});
-  const end=e=>{if(!drag)return;drag=false;main.style.transition="";
-   if(cap){try{main.releasePointerCapture(e.pointerId);}catch(_){}}
-   if(!moved){if(openId===rid){main.style.transform="";openId=null;}return;}
-   const t=(openId===rid?-72:0)+(e.clientX-sx);
-   if(t<-36){closeOpen(rid);main.style.transform="translateX(-72px)";row.classList.add("open");openId=rid;}
-   else{main.style.transform="";row.classList.remove("open");if(openId===rid)openId=null;}};
-  main.addEventListener("pointerup",end);
-  main.addEventListener("pointercancel",()=>{drag=false;main.style.transition="";
-   main.style.transform=openId===rid?"translateX(-72px)":"";row.classList.toggle("open",openId===rid);});
-  main.addEventListener("click",e=>{if(suppressClick||drag||moved)return;
-   if(e.target.closest(".kcell"))openEdit(rid);});
-  row.querySelectorAll(".delzone2").forEach(b=>b.addEventListener("click",()=>delId(rid)));
- });
-}
-async function sendText(){
- if(busy)return;
- const t=$("text").value.trim();if(!t)return;
- setLoading("识别中…");
- try{const j=await api("/api/meal",{method:"POST",headers:{"Content-Type":"application/json"},
-   body:JSON.stringify({user:user,text:t,date:viewDate||todayStr()})},240000);
-  if(j.reply&&j.reply.indexOf("没识别出")>=0){showErr(j.reply);}else{showOk(j.reply);bump();invalidateMonthCache();refresh();}
-  $("text").value="";
- }catch(e){showErr(friendly(e.message));}
-}
-function friendly(m){
- if(/abort/i.test(m))return "已取消等待（后台可能已记上，稍后在明细核对）";
- if(/timed out/i.test(m))return "网关高峰无响应（已等待超时）。稍后重试；长语音建议拆成按餐短句，更快更稳";
- if(/api_key/i.test(m))return m;
- return m;
-}
-$("text").addEventListener("keydown",e=>{if(e.key==="Enter"){e.preventDefault();sendText();}});
-$("bSend").onclick=sendText;
-$("bPhoto").onclick=()=>$("photo").click();
-// ---- 分析结果页（照片专用：识别→修正→确认保存）----
-const MEALS=["早餐","午餐","晚餐","加餐"];
-let avItems=[],avB64=null,avMeal="早餐",avBusy=false,avTarget={protein:0,fat:0,carb:0},avDay={protein:0,fat:0,carb:0};
-$("avmenu").innerHTML=MEALS.map(m=>"<button data-m='"+m+"'>"+m+"</button>").join("");
-function hourMeal(h){return h<10?"早餐":h<14?"午餐":h<17?"加餐":h<21?"晚餐":"加餐";}
-function exifHour(buf){
- try{
-  const v=new DataView(buf);
-  if(v.byteLength<12||v.getUint16(0)!==0xFFD8)return null;
-  let off=2;
-  while(off+4<v.byteLength){
-   if(v.getUint8(off)!==0xFF)break;
-   const mk=v.getUint8(off+1),len=v.getUint16(off+2);
-   if(mk===0xE1&&off+10<v.byteLength&&v.getUint32(off+4)===0x45786966)return tiffHour(off+10);
-   off+=2+len;
-  }
- }catch(e){}
- return null;
- function tiffHour(t){
-  const le=v.getUint16(t)===0x4949;
-  const g16=o=>v.getUint16(t+o,le),g32=o=>v.getUint32(t+o,le);
-  let ifd=t+g32(4),ptr=0,hour=null;
-  for(let pass=0;pass<2&&ifd;pass++){
-   const n=g16(ifd);
-   for(let i=0;i<n;i++){
-    const en=ifd+2+i*12,tag=g16(en);
-    if(pass===0&&tag===0x8769)ptr=g32(en+8);
-    if(pass===1&&tag===0x9003){
-     const s=t+g32(en+8);let dt="";
-     for(let k=0;k<19;k++){const c=v.getUint8(s+k);if(c>=32)dt+=String.fromCharCode(c);}
-     const m=dt.match(/\d{4}:\d{2}:\d{2} (\d{2}):(\d{2})/);
-     if(m)hour=+m[1];
-    }
-   }
-   ifd=pass===0&&ptr?t+ptr:null;
-  }
-  return hour;
- }
-}
-let avInt=null;
-function avWait(msg){$("avItems").innerHTML="<div class='avload'><span class='spin'></span> "+msg+" <b id='avel'></b></div>";
- const t0=Date.now();if(avInt)clearInterval(avInt);
- avInt=setInterval(()=>{const el=$("avel");if(!el){if(avInt)clearInterval(avInt);return;}
-  const s=Math.round((Date.now()-t0)/1000);
-  const ph=s<10?"":s<25?" · 正在分析份量…":s<45?" · 正在计算热量…":" · 网络高峰，马上好…";
-  el.textContent=s+"s"+ph;},500);}
-function avDone(){if(avInt)clearInterval(avInt);avInt=null;}
-function avBusyUI(on){$("avFix").disabled=on;$("avSave").disabled=on;}
-function renderAv(){
- avDone();
- $("avMeal").textContent="今天 "+avMeal+" ▼";
- $("avmenu").querySelectorAll("button").forEach(b=>b.classList.toggle("on",b.dataset.m===avMeal));
- const tot=k=>avItems.reduce((s,i)=>s+(i[k]||0),0);
- const has=avItems.length>0;
- $("avKcal").style.display=has?"block":"none";
- $("avM").style.display=has?"flex":"none";
- if(has){
-  $("avKcal").innerHTML="<div class='text-heading'>这餐热量</div>"+
-   "<div class='text-huge-cal'>"+tot("kcal")+" <span class='text-unit'>千卡</span></div>"+
-   "<div style='display:flex;justify-content:flex-end;margin-top:10px'><span class='tag'>今天 "+avMeal+"</span></div>";
-  $("avM").innerHTML=mcard("蛋白质",tot("protein_g"),avDay.protein,avTarget.protein)+
-   mcard("脂肪",tot("fat_g"),avDay.fat,avTarget.fat)+
-   mcard("碳水",tot("carb_g"),avDay.carb,avTarget.carb);
- }
- let h="";
- for(const it of avItems)h+="<div class='avitem'><div class='avname'><b>"+esc(it.food)+"</b> <span class='muted'>"+
-  esc(it.portion||"")+"</span> "+esc(it.note||"")+"</div><div class='avk'>"+it.kcal+" 千卡</div></div>";
- $("avItems").innerHTML=h||"<div class='avload'><span class='spin'></span> 识别中…</div>";
-}
-function mcard(label,mealVal,dayVal,target){
- const pct=target>0?Math.min(100,Math.round(dayVal/target*100)):0;
- const R=26,C=2*Math.PI*R,off=C*(1-pct/100);
- return "<div class='card mcd'><div class='mcrow'>"+
-  "<svg width='64' height='64' viewBox='0 0 64 64'>"+
-  "<circle class='ring-track' cx='32' cy='32' r='"+R+"' fill='none' stroke-width='7'/>"+
-  "<circle class='ring-fill' cx='32' cy='32' r='"+R+"' fill='none' stroke-width='7' stroke-linecap='round' "+
-  "stroke-dasharray='"+C+"' stroke-dashoffset='"+off+"' transform='rotate(-90 32 32)'/>"+
-  "<text x='32' y='37' text-anchor='middle' font-size='13.5' font-weight='700' style='fill:var(--text-main)'>"+pct+"%</text></svg>"+
-  "<div class='mcol'><div class='mc-l'>"+label+"</div><div class='mc-v'>"+mealVal+"g</div></div></div>"+
-  "<div class='mc-n'>已吃 <b>"+dayVal+"g</b> / 目标 <b>"+(target||0)+"g</b></div></div>";
-}
-function closeAv(){$("av").style.display="none";avBusy=false;}
-$("avBack").onclick=()=>{
- if(avItems.length&&!avSaved&&!confirm("识别结果未保存，确定放弃吗？"))return;
- closeAv();};
-$("avMeal").onclick=e=>{e.stopPropagation();
- const m=$("avmenu");m.style.display=m.style.display==="block"?"none":"block";};
-$("avmenu").addEventListener("click",e=>{const b=e.target.closest("button");if(!b)return;
- avMeal=b.dataset.m;renderAv();$("avmenu").style.display="none";});
-document.addEventListener("click",e=>{if(!e.target.closest("#avmenu")&&!e.target.closest("#avMeal"))$("avmenu").style.display="none";});
-$("avSave").onclick=async()=>{
- if(avBusy||!avItems.length)return;avBusy=true;
- try{
-  await api("/api/save",{method:"POST",headers:{"Content-Type":"application/json"},
-   body:JSON.stringify({user:user,meal_type:avMeal,items:avItems,image:avB64,date:viewDate||todayStr()})});
-  const kcal=avItems.reduce((s,i)=>s+(i.kcal||0),0);
-  closeAv();toast((kcal<0?"已扣回 ":"已记录 ")+kcal+" 千卡");invalidateMonthCache();refresh();
- }catch(e){toast("保存失败："+e.message);}
- avBusy=false;
-};
-let fixB64=null;
-$("avFix").onclick=()=>{if(avBusy||!avB64)return;
- fixB64=null;$("fixText").value="";$("fixCnt").textContent="0/200";
- $("fixThumb").style.display="none";$("fixPhotoHint").textContent="可选：拍剩余的盘子，AI 按图扣减";
- $("fixErr").classList.remove("show");
- showBack("fixBack");$("fixText").focus();};
-$("fixClose").onclick=()=>{if(avBusy){toast("AI 正在分析，请稍候…");return;}hideBack("fixBack");};
-$("fixBack").onclick=e=>{if(e.target.id!=="fixBack")return;
- if(avBusy){toast("AI 正在分析，请稍候…");return;}hideBack("fixBack");};
-$("fixText").addEventListener("input",e=>{$("fixCnt").textContent=e.target.value.length+"/200";});
-$("fixPhotoBtn").onclick=()=>$("fixPhoto").click();
-$("fixPhoto").addEventListener("change",async e=>{
- const f=e.target.files[0];e.target.value="";
- if(!f)return;
- try{
-  const img=new Image();img.src=await new Promise((ok,no)=>{const fr=new FileReader();
-   fr.onload=()=>ok(fr.result);fr.onerror=no;fr.readAsDataURL(f);});
-  await new Promise(ok=>img.onload=ok);
-  const cv=document.createElement("canvas"),s=Math.min(1,1024/Math.max(img.width,img.height));
-  cv.width=img.width*s;cv.height=img.height*s;cv.getContext("2d").drawImage(img,0,0,cv.width,cv.height);
-  fixB64=cv.toDataURL("image/jpeg",0.8).split(",")[1];
-  const th=$("fixThumb");th.src="data:image/jpeg;base64,"+fixB64;th.style.display="block";
-  $("fixPhotoHint").textContent="已附剩余照片 ✓";
- }catch(err){toast("读图失败："+err.message);}
-});
-$("fixOk").onclick=async()=>{
- const t=$("fixText").value.trim();
- if(!t&&!fixB64){toast("写修正内容或附剩余照片");return;}
- avBusy=true;$("fixOk").disabled=true;
- const t0=Date.now();
- $("fixOk").innerHTML="<span class='spin' style='border-color:rgba(255,255,255,.5);border-top-color:#fff;display:inline-block;vertical-align:-2px;margin-right:6px'></span>分析中… <b id='fs'>0s</b>";
- const fi=setInterval(()=>{const el=$("fs");if(!el){clearInterval(fi);return;}
-  el.textContent=Math.round((Date.now()-t0)/1000)+"s";},500);
- const fe=$("fixErr");fe.classList.remove("show");
- try{
-  const j=await api("/api/analyze",{method:"POST",headers:{"Content-Type":"application/json"},
-   body:JSON.stringify({user:user,image:fixB64||avB64,text:t,prev:avItems})},200000);
-  clearInterval(fi);
-  avItems=j.items||[];if(j.targets)avTarget=j.targets;if(j.day)avDay=j.day;renderAv();hideBack("fixBack");
- }catch(e){
-  clearInterval(fi);
-  fe.textContent="修正失败："+e.message+"（已识别结果未丢失，可重试或返回）";
-  fe.classList.add("show");
- }
- $("fixOk").disabled=false;$("fixOk").textContent="确定";avBusy=false;
-};
-$("photo").addEventListener("change",async e=>{
- const f=e.target.files[0];e.target.value="";
- if(!f||avBusy)return;
- avBusy=true;
- try{
-  const hr=exifHour(await f.arrayBuffer());
-  avMeal=hr!=null?hourMeal(hr):hourMeal(new Date().getHours());
-  const img=new Image();img.src=await new Promise((ok,no)=>{const fr=new FileReader();
-   fr.onload=()=>ok(fr.result);fr.onerror=no;fr.readAsDataURL(f);});
-  await new Promise(ok=>img.onload=ok);
-  const cv=document.createElement("canvas"),s=Math.min(1,1024/Math.max(img.width,img.height));
-  cv.width=img.width*s;cv.height=img.height*s;cv.getContext("2d").drawImage(img,0,0,cv.width,cv.height);
-  avB64=cv.toDataURL("image/jpeg",0.8).split(",")[1];
-  $("avImg").src="data:image/jpeg;base64,"+avB64;
-  avItems=[];$("av").style.display="block";window.scrollTo(0,0);renderAv();
-  avBusyUI(true);
-  avWait("识别中");
-  const j=await api("/api/analyze",{method:"POST",headers:{"Content-Type":"application/json"},
-   body:JSON.stringify({user:user,image:avB64})},200000);
-  avItems=j.items||[];if(j.targets)avTarget=j.targets;if(j.day)avDay=j.day;renderAv();
-  if(!avItems.length)$("avItems").innerHTML="<div class='avload'>🤔 没识别出食物：点「AI 修正」描述一下，或返回重拍</div>";
- }catch(err){avDone();toast("识别失败："+friendly(err.message));closeAv();}
- avBusyUI(false);avBusy=false;
-});
-// ---- 编辑抽屉 & 删除确认 ----
-let editId0=null,editB64=null,editBusy=false,delId0=null;
-function openEdit(id){
- const r=_recs[id];if(!r)return;editId0=id;editB64=null;
- if(r.photo){$("eThumb").style.display="block";$("eThumbPh").style.display="none";loadThumb(id,$("eThumb"),user);}
- else{$("eThumb").style.display="none";$("eThumbPh").style.display="flex";}
- $("eFood").value=r.food;$("ePortion").value=r.portion||"";
- $("eKcal").value=r.kcal;$("eProtein").value=(r.protein_g==null?"":r.protein_g);
- editBase={kcal:r.kcal||0,per:pnum(r.portion),prot:(r.protein_g==null?null:r.protein_g)};
- kcalTouched=false;protTouched=false;
- $("ePills").innerHTML=MEALS.map(m=>"<button data-m='"+m+"' class='"+(m===r.meal_type?"on":"")+"'>"+m+"</button>").join("");
- $("ePills").querySelectorAll("button").forEach(b=>b.onclick=()=>{
-  $("ePills").querySelectorAll("button").forEach(x=>x.classList.remove("on"));b.classList.add("on");});
- showBack("editBack");requestAnimationFrame(()=>$("editBack").classList.add("open"));
-}
-function pnum(s){const m=String(s||"").match(/(\d+(?:\.\d+)?)/);return m?parseFloat(m[1]):null;}
-let editBase={kcal:0,per:null,prot:null},kcalTouched=false,protTouched=false;
-$("ePortion").addEventListener("input",()=>{
- if(kcalTouched&&protTouched)return;
- const nNew=pnum($("ePortion").value),nOld=editBase.per;
- if(!nOld||!nNew||nNew<=0)return;
- if(!kcalTouched&&editBase.kcal>0)$("eKcal").value=Math.round(editBase.kcal*nNew/nOld);
- if(!protTouched&&editBase.prot!=null)$("eProtein").value=Math.round(editBase.prot*nNew/nOld);
-});
-$("eKcal").addEventListener("input",()=>{kcalTouched=true;});
-$("eProtein").addEventListener("input",()=>{protTouched=true;});
-function closeEdit(){$("editBack").classList.remove("open");hideBack("editBack");}
-$("editBack").onclick=e=>{if(!e.target.closest(".sheet"))closeEdit();};
-$("eClose").onclick=closeEdit;$("eCancel").onclick=closeEdit;
-$("eThumb").onclick=()=>$("ePhoto").click();$("eThumbPh").onclick=()=>$("ePhoto").click();
-$("ePhoto").addEventListener("change",async e=>{
- const f=e.target.files[0];e.target.value="";if(!f)return;
- try{
-  const img=new Image();img.src=await new Promise((ok,no)=>{const fr=new FileReader();fr.onload=()=>ok(fr.result);fr.onerror=no;fr.readAsDataURL(f);});
-  await new Promise(ok=>img.onload=ok);
-  const cv=document.createElement("canvas"),s=Math.min(1,1024/Math.max(img.width,img.height));
-  cv.width=img.width*s;cv.height=img.height*s;cv.getContext("2d").drawImage(img,0,0,cv.width,cv.height);
-  editB64=cv.toDataURL("image/jpeg",0.8).split(",")[1];
-  $("eThumb").src="data:image/jpeg;base64,"+editB64;$("eThumb").style.display="block";$("eThumbPh").style.display="none";
- }catch(err){toast("读图失败："+err.message);}
-});
-$("eSave").onclick=async()=>{
- if(editBusy)return;editBusy=true;$("eSave").disabled=true;$("eSave").textContent="保存中…";
- const meal=$("ePills").querySelector("button.on").dataset.m;
- const kcalV=$("eKcal").value;
- try{
-  await api("/api/correct",{method:"POST",headers:{"Content-Type":"application/json"},
-   body:JSON.stringify({id:editId0,action:"edit",
-    food:$("eFood").value.trim()||undefined,kcal:kcalV===""?undefined:parseFloat(kcalV),
-    portion:$("ePortion").value.trim(),protein_g:$("eProtein").value===""?undefined:parseFloat($("eProtein").value),
-    meal_type:meal,image:editB64||undefined})},60000);
-  closeEdit();bump();invalidateMonthCache();refresh();toast("已保存 ✓");
- }catch(e){toast("保存失败："+e.message);}
- $("eSave").disabled=false;$("eSave").textContent="保存修改";editBusy=false;
-};
-async function delId(id){try{await api("/api/correct",{method:"POST",headers:{"Content-Type":"application/json"},
-  body:JSON.stringify({id:id,action:"delete"})});toast("已删除");bump();invalidateMonthCache();refresh();}catch(e){toast("删除失败："+e.message);}}
-let clearing=false;
-$("clearBtn").onclick=()=>showBack("clearBack");
-$("cCancel").onclick=()=>hideBack("clearBack");
-$("cOk").onclick=async()=>{
- hideBack("clearBack");if(clearing)return;clearing=true;
- try{const j=await api("/api/clear",{method:"POST",headers:{"Content-Type":"application/json"},
-  body:JSON.stringify({user:user,date:viewDate||todayStr()})});toast("已清空 "+j.cleared+" 条");bump();invalidateMonthCache();refresh();}
- catch(e){toast("清空失败："+e.message);}
- clearing=false;
-};
-function bump(){const el=$("remain");el.classList.remove("bump");void el.offsetWidth;el.classList.add("bump");}
-// ---- 本周训练卡（计划 vs 实际）----
-const WKDAYS=["周一","周二","周三","周四","周五","周六","周日"];
-async function ensureMonth(ym){
- ym=ym.slice(0,7); // 兼容误传完整日期（后端校验 YYYY-MM，传整日期会400且被静默吞掉）
- if(monthFetched[ym])return;monthFetched[ym]=true;
- try{const j=await api("/api/month?user="+user+"&ym="+ym);
-  j.days.forEach(d=>monthDays[d.date]={eaten:d.eaten,n:d.n});
- }catch(e){delete monthFetched[ym];}
-}
-function renderStrip(){
- const el=$("strip");let h="";
- const sel=viewDate||todayStr();
- for(let i=6;i>=0;i--){
-  const d=new Date();d.setDate(d.getDate()-i);
-  const ds=d.toISOString().slice(0,10);
-  const wd=["日","一","二","三","四","五","六"][d.getDay()];
-  const md=monthDays[ds]||{},n=md.n||0;
-  const pct=n&&CAL_TARGET?md.eaten/CAL_TARGET*100:0;
-  const selCls=(ds===sel)?" sel":"";
-  const todayCls=(ds===todayStr())?" today":"";
-  h+="<div class='sday"+(n>0?" has":"")+selCls+todayCls+"' data-d='"+ds+"'>"+
-   "<div class='swd'>"+wd+"</div><div class='ring'>"+(n?ringSvg(pct):"")+d.getDate()+"</div></div>";
- }
- el.innerHTML=h;
- el.querySelectorAll(".sday").forEach(sd=>sd.onclick=()=>setViewDate(sd.dataset.d));
-}
-function renderWK(plan,wk){
- const el=$("wkCard");
- if(!plan.days||!plan.days.length){
-  el.innerHTML="<div style='display:flex;align-items:center'><div class='muted' style='flex:1'>🏋️ 还没有训练计划</div>"+
-   "<button class='tag' style='cursor:pointer' onclick='showPTab(\"tPlan\",\"pPlan\")'>去设置导入</button></div>";
-  return;}
- const doneBy={};wk.forEach(w=>doneBy[w.date]=(doneBy[w.date]||0)+1);
- const monday=new Date();monday.setDate(monday.getDate()-monday.getDay()+1);
- const today=new Date().toISOString().slice(0,10);
- let h="<div style='display:flex;align-items:center;margin-bottom:6px'>"+
-  "<div style='font-weight:700;color:var(--text-main)'>🏋️ 本周训练</div>"+
-  "<div class='muted' style='margin-left:auto'>计划 "+plan.days.length+" 练 · 已练 "+wk.length+"</div></div>";
- for(const d of plan.days){
-  const idx=WKDAYS.indexOf(d.dow);if(idx<0)continue;
-  const ds=new Date(monday);ds.setDate(ds.getDate()+idx);
-  const dsStr=ds.toISOString().slice(0,10);
-  const dn=doneBy[dsStr]||0;
-  const mark=dn>0?"<span style='color:var(--color-primary);font-weight:700'>✓</span>":
-   (dsStr===today?"<span class='tag'>今天</span>":(dsStr<today?"<span class='muted'>✗</span>":"<span class='muted'>未到</span>"));
-  h+="<div class='wkrow'><span class='chip'>"+d.dow+"</span><span style='flex:1;color:var(--text-main)'>"+
-   d.parts.map(p=>esc(p.name)+(p.sets_reps?" "+esc(p.sets_reps):"")).join("、")+"</span>"+mark+"</div>";
- }
- el.innerHTML=h;
-}
-// ---- 减脂缺口滑块：实时计算明细 ----
-function updateCalc(){
- const w=parseFloat($("s_weight").value),h=parseFloat($("s_height").value),a=parseFloat($("s_age").value);
- const g=$("s_gender").value,d=parseInt($("s_days").value)||0;
- $("s_defval").textContent=$("s_deficit").value;
- if(!(w>0&&h>0&&a>0)){$("calcBox").innerHTML="<span class='muted'>填完身高/体重/年龄后显示计算明细</span>";return;}
- const bmr=Math.round(10*w+6.25*h-5*a+(g==="male"?5:-161));
- const af={0:1.2,1:1.26,2:1.32,3:1.38,4:1.44,5:1.5,6:1.56,7:1.6}[d]||1.35;
- const tdee=Math.round(bmr*af);
- const deficit=parseInt($("s_deficit").value)||0;
- const target=tdee-deficit;
- const floor=g==="male"?1500:1200;
- $("s_deficit").max=Math.max(0,Math.min(750,tdee-floor));
- const row=(l,v)=>"<div class='crow'><span>"+l+"</span><span>"+v+"</span></div>";
- let t=row("基础代谢",Math.round(bmr)+" 千卡")
-       +row("不减肥该吃（×"+af+" 活动系数）",tdee+" 千卡")
-       +row("减脂缺口","−"+deficit+" 千卡");
- let tot="目标摄入 <b>"+target+"</b> 千卡";
- if(target<floor){tot+=" <span class='warnred'>⚠️ 低于安全下限 "+floor+"</span>";}
- else if(deficit>0){tot+="<span class='muted'> ｜ 预计每周 −"+(deficit*7/7700).toFixed(2)+" kg</span>";}
- t+="<div class='caltotal'>"+tot+"</div>";
- $("calcBox").innerHTML=t;
-}
-["s_weight","s_height","s_age","s_days"].forEach(id=>$(id).addEventListener("input",updateCalc));
-$("s_gender").addEventListener("change",updateCalc);
-$("s_deficit").addEventListener("input",updateCalc);
-// 点空白处收起滑开的删除区
-document.addEventListener("click",e=>{
- if(openId!==null&&!e.target.closest("#list")&&!e.target.closest(".mback")&&!e.target.closest(".modal")){
-  closeOpen(null);}
-});
-refresh();
-</script></body></html>
-"""
+PAGES = {n: _load_web(n) for n in ("index.html", "app.css", "app.js")}
+ETAGS = {n: '"' + hashlib.md5(d).hexdigest()[:16] + '"' for n, d in PAGES.items()}
 
 # ---------------------------------------------------------------- HTTP
 
@@ -1609,10 +482,35 @@ class H(BaseHTTPRequestHandler):
             return True
         return hmac.compare_digest(self.headers.get("X-Access-Token") or "", code)
 
+    def _serve_static(self, name, ctype):
+        """页面静态文件：ETag 协商缓存 + gzip。重复打开页面命中304零下载，
+        首次打开 60KB→~15KB（公网4G体感显著）"""
+        data = PAGES[name]
+        et = ETAGS[name]
+        if self.headers.get("If-None-Match") == et:
+            self.send_response(304)
+            self.send_header("ETag", et)
+            self.end_headers()
+            return
+        resp_headers = [("Content-Type", ctype), ("ETag", et), ("Cache-Control", "no-cache")]
+        if "gzip" in (self.headers.get("Accept-Encoding") or ""):
+            data = gzip.compress(data, 6)
+            resp_headers.append(("Content-Encoding", "gzip"))
+        self.send_response(200)
+        for k, v in resp_headers:
+            self.send_header(k, v)
+        self.send_header("Content-Length", str(len(data)))
+        self.end_headers()
+        self.wfile.write(data)
+
     def do_GET(self):
         p = urlparse(self.path).path
         if p == "/" or p == "/index.html":
-            self._send(200, "text/html; charset=utf-8", INDEX.encode("utf-8"))
+            self._serve_static("index.html", "text/html; charset=utf-8")
+        elif p == "/app.css":
+            self._serve_static("app.css", "text/css; charset=utf-8")
+        elif p == "/app.js":
+            self._serve_static("app.js", "application/javascript; charset=utf-8")
         elif p == "/api/health":
             self._json(200, {"ok": True, "mock": CFG.get("mock", False)})
         elif p == "/deploy":
@@ -1674,6 +572,10 @@ class H(BaseHTTPRequestHandler):
             if row is None or (u and row["user_id"] != u):
                 return self._send(404, "image/jpeg", b"")
             fp = os.path.join(DATA, "meals", "record_%d.jpg" % rid)
+            if (q.get("thumb") or [""])[0] == "1":  # 列表48px缩略图：~8KB vs 原图100KB+
+                tfp = os.path.join(DATA, "meals", "record_%d_thumb.jpg" % rid)
+                if os.path.exists(tfp):
+                    fp = tfp
             if not os.path.exists(fp):
                 return self._send(404, "text/plain", b"not found")
             with open(fp, "rb") as f:
@@ -1787,10 +689,11 @@ class H(BaseHTTPRequestHandler):
             conn.execute("DELETE FROM meals WHERE user_id=? AND date=?", (user, date))
             conn.execute("DELETE FROM workouts WHERE user_id=? AND date=?", (user, date))
         for r in rows:
-            try:
-                os.remove(os.path.join(DATA, "meals", "record_%d.jpg" % r["id"]))
-            except OSError:
-                pass
+            for suffix in ("", "_thumb"):  # 原图+缩略图一起清
+                try:
+                    os.remove(os.path.join(DATA, "meals", "record_%d%s.jpg" % (r["id"], suffix)))
+                except OSError:
+                    pass
         self._json(200, {"ok": True, "cleared": len(rows)})
 
     def _handle_analyze(self, j):
@@ -1840,12 +743,17 @@ class H(BaseHTTPRequestHandler):
             it["meal_type"] = mt
         ids = insert_meals(user, items, j.get("date"))
         img_b64 = j.get("image")  # 本次分析的照片存档 → 明细缩略图
+        thumb_b64 = j.get("thumb")  # 前端canvas生成的240px缩略图（列表加载省流量）
         if img_b64:
             try:
                 blob = base64.b64decode(img_b64)
+                tblob = base64.b64decode(thumb_b64) if thumb_b64 else None
                 for rid in ids:
                     with open(os.path.join(DATA, "meals", "record_%d.jpg" % rid), "wb") as f:
                         f.write(blob)
+                    if tblob:
+                        with open(os.path.join(DATA, "meals", "record_%d_thumb.jpg" % rid), "wb") as f:
+                            f.write(tblob)
             except Exception:
                 pass
         summary = today_summary(user)
@@ -1993,10 +901,11 @@ class H(BaseHTTPRequestHandler):
         with db() as conn:
             if action == "delete":
                 conn.execute("DELETE FROM meals WHERE id=?", (rid,))
-                try:
-                    os.remove(os.path.join(DATA, "meals", "record_%d.jpg" % rid))  # 照片随记录一起删
-                except OSError:
-                    pass
+                for suffix in ("", "_thumb"):  # 照片随记录一起删（含缩略图）
+                    try:
+                        os.remove(os.path.join(DATA, "meals", "record_%d%s.jpg" % (rid, suffix)))
+                    except OSError:
+                        pass
                 return self._json(200, {"ok": True, "msg": "已删除"})
             if action == "edit":
                 old = conn.execute("SELECT user_id,date,food FROM meals WHERE id=?", (rid,)).fetchone()
@@ -2031,6 +940,10 @@ class H(BaseHTTPRequestHandler):
                     try:
                         with open(os.path.join(DATA, "meals", "record_%d.jpg" % rid), "wb") as f:
                             f.write(base64.b64decode(img))
+                        th = j.get("thumb")
+                        if th:
+                            with open(os.path.join(DATA, "meals", "record_%d_thumb.jpg" % rid), "wb") as f:
+                                f.write(base64.b64decode(th))
                     except Exception:
                         pass
                 return self._json(200, {"ok": True, "msg": "已更正"})
