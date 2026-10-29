@@ -28,17 +28,8 @@
  <div class="btnrow">
   <button class="photo" id="bPhoto">📷 拍照记录</button>
   <button class="send" id="bSend">发送</button></div>
- <input type="file" id="photo" accept="image/*" capture="environment" style="display:none">
- <input type="file" id="album" accept="image/*" style="display:none">
-<div class="mback up" id="pickBack" style="display:none">
- <div class="sheet">
-  <div class="etitle">记录饮食</div>
-  <div class="pickbtns">
-   <button id="pickCamera">📷 拍摄照片</button>
-   <button id="pickAlbum">🖼 从照片库选择</button>
-  </div>
-  <div class="ebtns"><button class="ghost" id="pickCancel">取消</button></div>
- </div></div>
+ <input type="file" id="photo" accept="image/*" style="display:none">
+ <!-- 无capture：iOS Safari弹原生三项（拍照/照片图库/选取文件），第三方浏览器的多余条目网页无法控制 -->
  <div id="reply"></div></div>
 <div class="card" id="wkCard" style="display:none"></div>
 <div class="card"><div style="display:flex;justify-content:flex-end;margin-bottom:6px">

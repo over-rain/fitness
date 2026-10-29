@@ -31,7 +31,6 @@ function enableDragClose(sheet,back,onClose,dir){
 }
 enableDragClose($("editBack").querySelector(".sheet"),$("editBack"),closeEdit,1);
 enableDragClose($("calBack").querySelector(".sheet"),$("calBack"),closeCal,-1);
-enableDragClose($("pickBack").querySelector(".sheet"),$("pickBack"),closePick,1);
 function applyTheme(t){document.querySelectorAll("[data-theme]").forEach(v=>v.setAttribute("data-theme",t));
  $("themeBtn").textContent=t==="meal"?"🌿":"🧊";localStorage.setItem("fg_theme",t);}
 $("themeBtn").onclick=()=>applyTheme(localStorage.getItem("fg_theme")==="meal"?"home":"meal");
@@ -352,12 +351,7 @@ function friendly(m){
 }
 $("text").addEventListener("keydown",e=>{if(e.key==="Enter"){e.preventDefault();sendText();}});
 $("bSend").onclick=sendText;
-$("bPhoto").onclick=()=>{showBack("pickBack");requestAnimationFrame(()=>$("pickBack").classList.add("open"));};
-function closePick(){$("pickBack").classList.remove("open");hideBack("pickBack");}
-$("pickCancel").onclick=closePick;
-$("pickBack").onclick=e=>{if(!e.target.closest(".sheet"))closePick();};
-$("pickCamera").onclick=()=>{closePick();$("photo").click();};
-$("pickAlbum").onclick=()=>{closePick();$("album").click();};
+$("bPhoto").onclick=()=>$("photo").click(); // Safari原生三项弹层已够用，不再自绘
 // ---- 分析结果页（照片专用：识别→修正→确认保存）----
 const MEALS=["早餐","午餐","晚餐","加餐"];
 let avItems=[],avB64=null,avMeal="早餐",avBusy=false,avTarget={protein:0,fat:0,carb:0},avDay={protein:0,fat:0,carb:0};
@@ -529,7 +523,6 @@ async function mealPhotoChange(e){ // 拍照/相册共用入口
  avBusyUI(false);avBusy=false;
 }
 $("photo").addEventListener("change",mealPhotoChange);
-$("album").addEventListener("change",mealPhotoChange);
 // ---- 编辑抽屉 & 删除确认 ----
 let editId0=null,editB64=null,editBusy=false,delId0=null;
 function openEdit(id){

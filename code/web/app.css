@@ -337,9 +337,3 @@ button{transition:transform .12s;font-family:var(--font-family)}
 #av{animation:fadeIn .2s}
 #list{transition:opacity .15s var(--ease-out)}
 #list.dim{opacity:.45} /* 乐观切换：切日期时旧明细淡化，数据到位恢复 */
-/* 记录入口自绘选择弹层：拍摄/照片库两选项（系统弹层的云端盘等条目网页无法控制） */
-.pickbtns{display:flex;flex-direction:column;gap:10px;margin-bottom:14px}
-.pickbtns button{border:1.5px solid var(--color-card-border);background:var(--color-primary-soft);
- color:var(--color-primary);border-radius:var(--radius-btn);padding:15px;font-size:var(--font-size-body);
- font-weight:600;cursor:pointer}
-.pickbtns button:active{transform:scale(.97);opacity:.85}
