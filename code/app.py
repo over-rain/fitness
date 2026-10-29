@@ -570,11 +570,12 @@ class H(BaseHTTPRequestHandler):
                 return self._json(400, {"error": "ym 格式须为 YYYY-MM"})
             with db() as conn:
                 rows = conn.execute(
-                    "SELECT date, SUM(kcal) eaten, COUNT(*) n FROM meals"
+                    "SELECT date, SUM(kcal) eaten, COUNT(*) n, SUM(protein_g) prot FROM meals"
                     " WHERE user_id=? AND date LIKE ? GROUP BY date ORDER BY date",
                     (user, ym + "%")).fetchall()
             self._json(200, {"ym": ym, "days": [
-                {"date": r["date"], "eaten": r["eaten"] or 0, "n": r["n"]} for r in rows]})
+                {"date": r["date"], "eaten": r["eaten"] or 0, "n": r["n"],
+                 "prot": r["prot"] or 0} for r in rows]})
         elif p == "/api/plan":
             if not self._authed():
                 return self._json(401, {"error": "需要访问码"})

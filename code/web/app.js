@@ -123,7 +123,7 @@ async function api(path,opts,tmo,retried){const ctl=("AbortController"in window)
   if(!r.ok)throw new Error((j&&j.error)||("HTTP "+r.status));return j;}
  finally{if(to)clearTimeout(to);}}
 let busy=false,timer=null,suppress=false,activeCtl=null;
-let viewDate=null,monthDays={},monthFetched={},CAL_TARGET=0; // monthDays按用户切换时清空（避免串数据）
+let viewDate=null,monthDays={},monthFetched={},CAL_TARGET=0,CAL_PROTT=0; // monthDays按用户切换时清空（避免串数据）
 function invalidateMonthCache(){monthFetched={};} // 记录/删除/清空后调用，否则环的月度聚合是死缓存
 function ringSvg(pct){ // 进度环组件：viewBox 44 自适应容器；弧封顶100%，dashoffset 纯CSS过渡
  const R=19,SW=3,C=2*Math.PI*R,off=C*(1-Math.min(100,Math.max(0,pct))/100);
@@ -140,8 +140,22 @@ function labelFor(ds){const t=todayStr();
  return (d.getMonth()+1)+"月"+d.getDate()+"日 "+["周日","周一","周二","周三","周四","周五","周六"][d.getDay()];}
 function dstrShift(base,n){const d=new Date((base||todayStr())+"T12:00:00");d.setDate(d.getDate()+n);return d.toISOString().slice(0,10);}
 function setViewDate(ds){if(ds>todayStr())ds=todayStr();
+ viewDate=(ds===todayStr())?null:ds;
  $("list").classList.add("dim"); // 乐观切换：旧明细淡化保持可见，数据到了再替换
- viewDate=(ds===todayStr())?null:ds;renderDateHead();refresh();}
+ const hc=$("heroCard");if(hc)hc.classList.add("dim");
+ optimisticHero(); // 月度缓存立即算剩余，不等公网roundtrip
+ renderDateHead();refresh();}
+function optimisticHero(){ // 乐观渲染剩余卡（eaten/prot 来自月度缓存）；响应到达后 renderHero 校正
+ const md=monthDays[viewDate||todayStr()];
+ if(!md||!CAL_TARGET)return;
+ const tgt=CAL_TARGET,eaten=md.eaten||0,prot=md.prot||0,rem=tgt-eaten;
+ countUp($("remain"),rem);
+ const pct=Math.max(0,Math.min(100,tgt?eaten/tgt*100:0));
+ const bar=$("bar");bar.classList.toggle("warn",pct>85);
+ bar.firstElementChild.style.width=pct+"%";
+ $("sumline").textContent=(rem<0?"⚠️ 已超出 "+(-rem)+" 千卡 ｜ ":"")
+  +"已吃 "+eaten+" / "+tgt+" kcal ｜ 蛋白 "+prot+" / "+(CAL_PROTT||0)+" g";
+ const d=$("dinner");d.classList.toggle("show",viewDate==null&&!!d.textContent);}
 let calY=0,calM=0;
 function openCal(){const b=viewDate||todayStr();calY=+b.slice(0,4);calM=+b.slice(5,7);
  showBack("calBack");requestAnimationFrame(()=>$("calBack").classList.add("open"));renderCal();}
@@ -249,15 +263,18 @@ async function refresh(){
  await Promise.all([ensureMonth(todayStr()),ensureMonth(dstrShift(todayStr(),-7))]); // 补拉上月：周条跨月天有环数据
  renderStrip();
 }
-function countUp(el,to){ // 剩余热量数字平滑过渡：300ms ease-out（rAF三次缓出），避免数值跳变
- const from=parseInt(el.textContent,10)||0;if(from===to){el.textContent=to;return;}
+function countUp(el,to){ // 剩余热量数字平滑过渡：300ms ease-out；重入先取消上一动画（防连点时多动画互写卡死）
+ if(el._raf)cancelAnimationFrame(el._raf);
+ const from=parseInt(el.textContent,10)||0;if(from===to){el.textContent=to;el._raf=0;return;}
  const t0=performance.now(),dur=300;
  const step=t=>{const p=Math.min(1,(t-t0)/dur),e=1-Math.pow(1-p,3);
   el.textContent=Math.round(from+(to-from)*e);
-  if(p<1)requestAnimationFrame(step);};
- requestAnimationFrame(step);}
+  el._raf=p<1?requestAnimationFrame(step):0;};
+ el._raf=requestAnimationFrame(step);}
 function renderHero(j){
  CAL_TARGET=j.target||CAL_TARGET; // 环形比例的分母（当日目标热量）
+ CAL_PROTT=j.protein_target||CAL_PROTT;
+ const hc=$("heroCard");if(hc)hc.classList.remove("dim");
  countUp($("remain"),j.remaining);
  $("remain").classList.toggle("over",j.remaining<0);
  const pct=Math.max(0,Math.min(100,j.target?j.eaten/j.target*100:0));
@@ -597,7 +614,7 @@ async function ensureMonth(ym){
  ym=ym.slice(0,7); // 兼容误传完整日期（后端校验 YYYY-MM，传整日期会400且被静默吞掉）
  if(monthFetched[ym])return;monthFetched[ym]=true;
  try{const j=await api("/api/month?user="+user+"&ym="+ym);
-  j.days.forEach(d=>monthDays[d.date]={eaten:d.eaten,n:d.n});
+  j.days.forEach(d=>monthDays[d.date]={eaten:d.eaten,n:d.n,prot:d.prot||0});
  }catch(e){delete monthFetched[ym];}
 }
 function renderStrip(){
