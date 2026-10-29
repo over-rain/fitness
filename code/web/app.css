@@ -337,3 +337,7 @@ button{transition:transform .12s;font-family:var(--font-family)}
 #av{animation:fadeIn .2s}
 #list{transition:opacity .15s var(--ease-out)}
 #list.dim{opacity:.45} /* 乐观切换：切日期时旧明细淡化，数据到位恢复 */
+/* PWA standalone：内容避开刘海/状态栏（浏览器模式 safe-area=0 无影响） */
+#homeView{padding-top:calc(14px + env(safe-area-inset-top))}
+.avbar{padding-top:calc(12px + env(safe-area-inset-top))}
+#avmenu{top:calc(56px + env(safe-area-inset-top))}

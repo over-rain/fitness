@@ -450,15 +450,44 @@ def build_card(items, summary, verb="记录"):
             f"蛋白 {summary['protein']}/{summary['protein_target']}g\n"
             f"🔜 剩余 {summary['remaining']} kcal")
 
-# ---------------------------------------------------------------- 页面
-
 # ---------------------------------------------------------------- 页面（静态文件，见 code/web/）
 WEB_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "web")
 def _load_web(name):
     with open(os.path.join(WEB_DIR, name), "rb") as f:
         return f.read()
 
-PAGES = {n: _load_web(n) for n in ("index.html", "app.css", "app.js")}
+PAGES = {n: _load_web(n) for n in ("index.html", "app.css", "app.js", "manifest.json")}
+
+_icon_cache = {}
+def _icon(size):
+    """零依赖PNG应用图标：薄荷底+白色75%进度环（呼应环形热量进度）。懒生成防拖慢启动"""
+    if size in _icon_cache:
+        return _icon_cache[size]
+    import math, struct, zlib
+    bg = (87, 195, 116)                       # --color-primary
+    fg = (255, 255, 255, 255)
+    tr = (206, 239, 215, 255)                 # 环轨道：实色浅薄荷（避免启动器alpha合成差异）
+    cx = cy = size / 2.0
+    R, half = size * 0.32, size * 0.0425
+    raw = bytearray()
+    for y in range(size):
+        raw.append(0)                          # PNG行滤波字节
+        for x in range(size):
+            d = math.hypot(x + .5 - cx, y + .5 - cy)
+            if abs(d - R) <= half:
+                ang = (math.degrees(math.atan2(x + .5 - cx, -(y + .5 - cy))) + 360.0) % 360.0
+                raw += bytes(fg if ang <= 270 else tr)
+            else:
+                raw += bytes(bg + (255,))
+
+    def chunk(t, d):
+        return struct.pack(">I", len(d)) + t + d + struct.pack(">I", zlib.crc32(t + d) & 0xffffffff)
+
+    ihdr = struct.pack(">IIBBBBB", size, size, 8, 6, 0, 0, 0)
+    png = (b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", ihdr)
+           + chunk(b"IDAT", zlib.compress(bytes(raw), 9)) + chunk(b"IEND", b""))
+    _icon_cache[size] = png
+    return png
 ETAGS = {n: '"' + hashlib.md5(d).hexdigest()[:16] + '"' for n, d in PAGES.items()}
 
 # ---------------------------------------------------------------- HTTP
@@ -511,6 +540,12 @@ class H(BaseHTTPRequestHandler):
             self._serve_static("app.css", "text/css; charset=utf-8")
         elif p == "/app.js":
             self._serve_static("app.js", "application/javascript; charset=utf-8")
+        elif p == "/manifest.json":
+            self._serve_static("manifest.json", "application/manifest+json")
+        elif p == "/apple-touch-icon.png":
+            self._send(200, "image/png", _icon(180))
+        elif p.startswith("/icon-") and p.endswith(".png") and p[6:-4].isdigit():
+            self._send(200, "image/png", _icon(int(p[6:-4])))
         elif p == "/api/health":
             self._json(200, {"ok": True, "mock": CFG.get("mock", False)})
         elif p == "/deploy":
