@@ -8,7 +8,7 @@ $("u1").onclick=()=>{user="beifeng";localStorage.setItem("fg_user",user);paintSe
 $("u2").onclick=()=>{user="gagayouna";localStorage.setItem("fg_user",user);paintSeg();clearReply();$("list").removeAttribute("data-ready");monthDays={};monthFetched={};CAL_TARGET=0;refresh();if($("mback").style.display==="flex")loadProfile();};
 function clearReply(){const el=$("reply");el.className="";el.textContent="";
  if(timer)clearInterval(timer);timer=null;suppress=true;busy=false;
- $("bPhoto").disabled=false;$("bAlbum").disabled=false;$("bSend").disabled=false;}
+ $("bPhoto").disabled=false;$("bSend").disabled=false;}
 function showBack(id){const el=$(id);el.style.display="flex";el.classList.remove("closing");}
 function hideBack(id){const el=$(id);el.classList.add("closing");
  setTimeout(()=>{el.style.display="none";el.classList.remove("closing");},260);}
@@ -31,6 +31,7 @@ function enableDragClose(sheet,back,onClose,dir){
 }
 enableDragClose($("editBack").querySelector(".sheet"),$("editBack"),closeEdit,1);
 enableDragClose($("calBack").querySelector(".sheet"),$("calBack"),closeCal,-1);
+enableDragClose($("pickBack").querySelector(".sheet"),$("pickBack"),closePick,1);
 function applyTheme(t){document.querySelectorAll("[data-theme]").forEach(v=>v.setAttribute("data-theme",t));
  $("themeBtn").textContent=t==="meal"?"🌿":"🧊";localStorage.setItem("fg_theme",t);}
 $("themeBtn").onclick=()=>applyTheme(localStorage.getItem("fg_theme")==="meal"?"home":"meal");
@@ -207,7 +208,7 @@ async function loadThumb(id,img,uid){
   if(ks.length>50){URL.revokeObjectURL(photoUrls[ks[0]]);delete photoUrls[ks[0]];}
  }catch(e){img.style.display="none";}
 }
-function setLoading(msg){busy=true;$("bPhoto").disabled=true;$("bAlbum").disabled=true;$("bSend").disabled=true;
+function setLoading(msg){busy=true;$("bPhoto").disabled=true;$("bSend").disabled=true;
  suppress=false;
  const el=$("reply"),t0=Date.now();el.className="wait";
  el.innerHTML="<span class='spin'></span>"+msg+" <b id='el'></b>"+
@@ -215,7 +216,7 @@ function setLoading(msg){busy=true;$("bPhoto").disabled=true;$("bAlbum").disable
  timer=setInterval(()=>{const el=$("el");if(!el){if(timer)clearInterval(timer);return;}
   const s=Math.round((Date.now()-t0)/1000);
   el.textContent=s+"s"+(s>12?" · 大图高峰会慢些":"");},500);}
-function done(){busy=false;$("bPhoto").disabled=false;$("bAlbum").disabled=false;$("bSend").disabled=false;if(timer)clearInterval(timer);}
+function done(){busy=false;$("bPhoto").disabled=false;$("bSend").disabled=false;if(timer)clearInterval(timer);}
 let sendCtl=null;
 function cancelWait(){if(activeCtl)activeCtl.abort();}
 function showOk(t){done();if(suppress)return;const el=$("reply");el.className="ok";el.textContent=t;}
@@ -351,7 +352,12 @@ function friendly(m){
 }
 $("text").addEventListener("keydown",e=>{if(e.key==="Enter"){e.preventDefault();sendText();}});
 $("bSend").onclick=sendText;
-$("bPhoto").onclick=()=>$("photo").click();
+$("bPhoto").onclick=()=>{showBack("pickBack");requestAnimationFrame(()=>$("pickBack").classList.add("open"));};
+function closePick(){$("pickBack").classList.remove("open");hideBack("pickBack");}
+$("pickCancel").onclick=closePick;
+$("pickBack").onclick=e=>{if(!e.target.closest(".sheet"))closePick();};
+$("pickCamera").onclick=()=>{closePick();$("photo").click();};
+$("pickAlbum").onclick=()=>{closePick();$("album").click();};
 // ---- 分析结果页（照片专用：识别→修正→确认保存）----
 const MEALS=["早餐","午餐","晚餐","加餐"];
 let avItems=[],avB64=null,avMeal="早餐",avBusy=false,avTarget={protein:0,fat:0,carb:0},avDay={protein:0,fat:0,carb:0};
@@ -524,7 +530,6 @@ async function mealPhotoChange(e){ // 拍照/相册共用入口
 }
 $("photo").addEventListener("change",mealPhotoChange);
 $("album").addEventListener("change",mealPhotoChange);
-$("bAlbum").onclick=()=>$("album").click();
 // ---- 编辑抽屉 & 删除确认 ----
 let editId0=null,editB64=null,editBusy=false,delId0=null;
 function openEdit(id){
