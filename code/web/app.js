@@ -141,13 +141,19 @@ function labelFor(ds){const t=todayStr();
 function dstrShift(base,n){const d=new Date((base||todayStr())+"T12:00:00");d.setDate(d.getDate()+n);return d.toISOString().slice(0,10);}
 function setViewDate(ds){if(ds>todayStr())ds=todayStr();
  viewDate=(ds===todayStr())?null:ds;
- $("list").classList.add("dim"); // 乐观切换：旧明细淡化保持可见，数据到了再替换
+ const md=monthDays[viewDate||todayStr()];
+ const sureEmpty=!md;
+ if(sureEmpty){ // /api/month只返回有记录的天 → 缓存无条目=该日无记录 → 立即空态+满额剩余，不等网络
+  $("list").innerHTML="<div class='muted' style='padding:8px 0'>这一天还没有记录</div>";
+  $("list").classList.remove("dim");
+ }else $("list").classList.add("dim"); // 旧明细淡化保持可见，数据到了再替换
  const hc=$("heroCard");if(hc)hc.classList.add("dim");
  optimisticHero(); // 月度缓存立即算剩余，不等公网roundtrip
+ if(sureEmpty&&hc)hc.classList.remove("dim"); // 空日的乐观值即真值，立即恢复
  renderDateHead();refresh();}
 function optimisticHero(){ // 乐观渲染剩余卡（eaten/prot 来自月度缓存）；响应到达后 renderHero 校正
- const md=monthDays[viewDate||todayStr()];
- if(!md||!CAL_TARGET)return;
+ const md=monthDays[viewDate||todayStr()]||{eaten:0,prot:0}; // 无缓存条目=该日无记录 → 零吃入
+ if(!CAL_TARGET)return;
  const tgt=CAL_TARGET,eaten=md.eaten||0,prot=md.prot||0,rem=tgt-eaten;
  countUp($("remain"),rem);
  const pct=Math.max(0,Math.min(100,tgt?eaten/tgt*100:0));
